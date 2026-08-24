@@ -1,0 +1,61 @@
+\section{Discussion, Limitations, and Conclusion}
+\label{section:conclusion}
+
+\subsection{Discussion}
+\label{sec:con:discussion}
+
+The results in Chapter~\ref{section:results} support the thesis statement, but it is worth being precise about which parts of the argument the evidence actually carries and which remain provisional.
+
+\textbf{The three failure modes are coupled, not independent.} This was the central claim of Chapter~\ref{section:analysis}, and the ablations bear it out in a specific way. Fine-grained rewards without a regularizer do not merely fail to help --- they actively destabilize long-form generation, as both the MASK-DPO baseline and the \emph{w/o KL} ablation show by collapsing on IU-Xray to well below the unaligned base model. Conversely, the regularizer contributes only about $4\%$ of the total loss magnitude (Figure~\ref{fig:training_dynamics}) yet its removal costs $22$ points of GREEN score. A component's importance is not proportional to its contribution to the objective value; the KL term works by constraining the direction of the update, not by supplying loss. Treating these design choices as an independent menu, as an ablation table implicitly invites, would misread the result.
+
+\textbf{Reward hacking is an optimization pathology, not only an evaluation artifact.} The most useful new evidence in this thesis is the training-dynamics analysis of Section~\ref{sec:res:dynamics}. That off-policy DPO scores poorly on medical accuracy was already known. What the optimizer logs add is the mechanism: reward accuracy reaches $1.0$ within roughly fifty steps, the margin saturates near $17$, and the gradient norm then falls to order $10^{-4}$ and stays there for the remaining ninety percent of training. The model does not fail to learn the clinical distinction because the distinction is hard; it stops learning anything at all once the stylistic shortcut has driven the logistic loss into its flat region. This reframes the remedy. On-policy construction is valuable not merely because it produces a better-calibrated preference signal, but because it keeps the objective difficult enough that optimization continues.
+
+\textbf{Grounding is separable from accuracy, and both need to be measured.} The layer-wise analysis shows DPO improving accuracy on several splits while its attention profile tracks the unaligned base model. Had this study reported only Table~\ref{tab:results_loss_updated}, it would have concluded that DPO partially works. The grounding measurements show that on several splits it works for the wrong reason. For a clinical system, the distinction is not academic: a model that is right by prior will fail on the atypical case, which is the case where it is most needed.
+
+\textbf{Where the gains concentrate is itself a finding.} Improvements are consistently larger on open-ended questions and report generation than on closed questions. This is what the diagnosis predicts --- a short binary answer is already approximately fine-grained, so localizing the reward buys little --- and it is a useful guide to where these techniques should be applied. It also suggests that the headline average understates the effect in the regime that matters most clinically, since free-text reporting is where hallucination is both most likely and most consequential.
+
+\subsection{Limitations}
+\label{sec:con:limitations}
+
+While \ourloss{} demonstrates consistent gains across medical VQA and report generation benchmarks, several limitations remain.
+
+\textbf{Dependence on external models.} The on-policy preference construction pipeline depends on external models --- \texttt{GPT-4o-mini} for VQA extraction, \texttt{Gemini 3 Flash Preview} for report refinement, and MedSAM3-v1 for lesion segmentation --- introducing potential error propagation when the task is more niche. An extraction error silently produces a mislabelled preference pair, and there is currently no audit of how often this occurs.
+
+\textbf{Reliance on segmentation quality.} The lesion-targeted corruption strategy requires reliable segmentation masks, which may be unavailable or imprecise for rare pathologies or underrepresented imaging modalities. Section~\ref{sec:exp:corpus} quantifies this: only $64.0\%$ of SLAKE records and $56.0\%$ of VQA-RAD records receive genuinely lesion-targeted corruption, the remainder falling back to global noise because no concept prompt could be extracted or because MedSAM3 returned no detection. The reported benefit of lesion-level corruption is therefore achieved with roughly $40\%$ of each VQA corpus receiving the weaker global treatment. A further restriction is structural rather than incidental: report generation admits no single query-relevant region, so IU-Xray uses holistic noise throughout and the visual term there tests dependence on the image as a whole rather than on a specific finding.
+
+\textbf{Restriction to radiology.} Our evaluation is confined to radiology, and it remains an open question whether the framework generalizes to other clinical imaging domains such as pathology, dermatology, or ophthalmology, which exhibit substantially different visual grounding characteristics. All evaluation is additionally in-distribution, on the test split of the dataset the model was aligned on.
+
+\textbf{Frozen perceptual front end.} Because the vision encoder and projector remain frozen, the method can change how visual evidence is weighed but cannot supply evidence the encoder never extracted. Errors rooted in perception rather than verbalization are outside its reach, as the qualitative analysis in Section~\ref{sec:res:qualitative} notes.
+
+\subsection{Broader Impact}
+\label{sec:con:impact}
+
+The broader impact of this work lies in its potential to enhance the reliability and factual consistency of AI-driven medical diagnostics. Improved alignment between model outputs and clinically decisive visual evidence could reduce hallucinated findings in radiology reports and medical VQA, supporting clinicians in time-sensitive diagnostic workflows.
+
+Ethical considerations remain paramount. The aligned model can still suffer from critical errors inherited from the base model, and improvements in fluency and apparent confidence may make residual errors \emph{harder} for a reader to detect rather than easier --- a risk this work shares with any method that improves surface quality alongside factuality. Responsible use requires safeguards against over-reliance on AI-generated medical advice in high-stakes decision-making contexts. The observation in Section~\ref{sec:res:qualitative} that DPO-aligned models collapse toward bare labels while \ourloss{} preserves explanatory framing is relevant here: a stated finding with its supporting observation can be audited by a clinician, whereas a bare label cannot.
+
+Future societal benefits may include reduced diagnostic errors, improved radiological workflow efficiency, and broader access to AI-assisted clinical interpretation in resource-limited settings. These gains must be pursued alongside rigorous prospective validation and ongoing ethical oversight to ensure that advances in fine-grained medical alignment genuinely serve the best interests of patients and healthcare providers.
+
+\subsection{Future Work}
+\label{sec:con:future}
+
+Several directions follow directly from the limitations above.
+
+\textbf{Reducing pipeline dependence.} The extraction and segmentation stages are the framework's most fragile components. Auditing extraction reliability against a human-labelled subset, and replacing or ensembling the segmentation model where masks are unreliable, would both improve quality and quantify the error propagation the current pipeline leaves unmeasured.
+
+\textbf{Iterative and online variants.} The construction is currently applied once, against the initial policy. Because the pipeline is fully automatic, it could be re-run against the aligned model to generate a fresh on-policy corpus, giving an iterative scheme in which the preference distribution tracks the policy. The training-dynamics analysis suggests a natural stopping criterion: iterate while the objective remains unsaturated.
+
+\textbf{Grounding as a training signal.} The attention-based grounding measures are used here purely for evaluation, which keeps them independent of the objective. Incorporating them directly into training is an obvious extension, though it would forfeit that independence and require a separate held-out grounding benchmark.
+
+\textbf{Clinician evaluation.} Ultimately, the claim that these gains are clinically meaningful requires clinician judgement rather than model-based judgement, on a stratified sample with inter-rater agreement reported.
+
+\subsection{Conclusion}
+\label{sec:con:conclusion}
+
+This thesis began from an empirical anomaly: preference optimization, which transformed alignment in the general domain, yields inconsistent gains over supervised fine-tuning on medical vision-language tasks. We argued that this is not a limitation of preference learning as such, but a consequence of three specific mismatches between the standard formulation and what clinical correctness requires --- a reward too coarse to isolate the decisive spans, a preference construction that confounds clinical content with response style, and an objective with no term tying an assertion to the evidence supporting it. To these we added a fourth consideration, the geometry of the KL regularizer, which governs whether alignment suppresses fluent-but-wrong continuations or merely preserves the base model's coverage.
+
+We presented \ourloss{}, which addresses all four within a single objective: preference pairs constructed by minimally editing the model's own generations so that style is held constant, a fine-grained ranking loss restricted to the clinically divergent spans, a bidirectional token-wise KL regularizer balancing coverage against tail suppression, and a dual-constraint visual term over lesion-corrupted images that reverses the preference when the supporting evidence has been destroyed.
+
+Across two backbones spanning medical-specialized and general-purpose pretraining, and three benchmarks spanning visual question answering and report generation, \ourloss{} outperforms standard DPO and prior fine-grained alignment methods, with an average relative improvement of $10.24\%$. Layer-wise attention analysis shows that the improvement is accompanied by stronger reliance on diagnostically relevant image regions, and controlled ablations isolate the contribution of each component. Analysis of the optimizer logs provides an independent, mechanistic account of stylistic reward hacking, showing an off-policy run saturating its objective within a twelfth of an epoch and ceasing to learn thereafter.
+
+The broader lesson is that alignment techniques do not transfer across domains unexamined. The properties that make DPO attractive --- that it needs only comparisons, and that it reduces to supervised learning on a static dataset --- are the same properties that let it be satisfied by a stylistic shortcut when the comparisons are constructed cheaply. In a domain where correctness is localized to a handful of tokens and depends on evidence the model may not be reading, the objective must be told where to look.

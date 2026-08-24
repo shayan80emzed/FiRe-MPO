@@ -1,0 +1,272 @@
+\newpage
+\appendix
+\addcontentsline{toc}{section}{Appendices}
+\section*{Appendices}
+\renewcommand{\thesubsection}{\Alph{subsection}}
+\setcounter{subsection}{0}
+
+\subsection{\ourloss{} Pseudocode}
+\label{app:pseudocode}
+
+The listing below gives the objective of Equation~\ref{eq:firempo-total} in executable form. All log-probability arguments are phrase-level, that is, already restricted to the positions selected by the \texttt{<mask>} spans of Section~\ref{sec:met:data}.
+
+\begin{verbatim}
+def FiRe-MPO(
+    self,
+    # phrase-level logprobs
+    chosen_phrase_logps, rejected_phrase_logps,
+    ref_chosen_phrase_logps, ref_rejected_phrase_logps,
+
+    # v' visual pair at phrase level
+    v_chosen_phrase_logps, v_rejected_phrase_logps,
+    ref_v_chosen_phrase_logps, ref_v_rejected_phrase_logps,
+
+    # token logits for phrase-level KL
+    chosen_logits, ref_chosen_logits, phrase_mask, ref_phrase_mask,
+
+    has_rejected_image,
+    beta, alpha, gamma, lambda,  # hyperparams
+):
+
+    # -------- 1) Base phrase preference --------
+    # margins computed from phrase-only logprobs
+    base_margin = beta * (
+        (chosen_phrase_logps - rejected_phrase_logps)
+        - (ref_chosen_phrase_logps - ref_rejected_phrase_logps)
+    )
+    base_loss = -F.logsigmoid(base_margin)  # [B]
+
+    # -------- 2) Visual preference (v' only, phrase-level) --------
+    v_margin = beta * (
+        (v_chosen_phrase_logps - v_rejected_phrase_logps)
+        - (ref_v_chosen_phrase_logps - ref_v_rejected_phrase_logps)
+    )
+    v_loss = -F.logsigmoid(v_margin)      # [B]
+
+    loss = base_loss + gamma * v_loss
+
+    # -------- 3) token-wise KL --------
+    logp_pi  = F.log_softmax(chosen_logits, dim=-1)       # [B,S,V]
+    logp_ref = F.log_softmax(ref_chosen_logits, dim=-1)   # [B,S,V]
+
+    # forward KL(ref || pi), then keep phrase positions only
+    tkl_tok = (logp_ref.exp() * (logp_ref - logp_pi)).sum(dim=-1)   # [B,S]
+    tkl = (tkl_tok * phrase_mask.float()).sum(dim=-1)               # [B]
+
+    # reverse KL(pi || ref), also phrase-only
+    rtkl_tok = (logp_pi.exp() * (logp_pi - logp_ref)).sum(dim=-1)   # [B,S]
+    rtkl = (rtkl_tok * ref_phrase_mask.float()).sum(dim=-1)         # [B]
+
+    mixed_tkl = lambda * tkl + (1.0 - lambda) * rtkl
+    loss = loss + alpha * mixed_tkl
+
+    return loss.mean()
+\end{verbatim}
+
+Note that in the visual term, \texttt{v\_chosen} corresponds to $y^-$ and \texttt{v\_rejected} to $y^+$: the preference is reversed under the corrupted image, as required by Equation~\ref{eq:firempo-rank}. The \texttt{has\_rejected\_image} flag masks that term out for records with no corrupted counterpart.
+
+\subsection{Prompt Templates}
+\label{app:prompts}
+
+The instructions used for processing the open-ended generated responses are given below. We utilize a multi-stage approach to first evaluate correctness (Stage 1) and then identify and incorporate fine-grained clinical differences (Stage 2).
+
+\begin{figure}[ht]
+\centering
+\begin{tcolorbox}[colback=boxgray, colframe=black!70, boxrule=0.5pt, arc=0mm, left=8pt, right=8pt, top=8pt, bottom=8pt]
+\small \ttfamily
+\{Stage 1: Prompt used in VQA answer localization.\} \\
+You are evaluating a model's answer to a medical question. \\
+\\
+Question: \{question\} \\
+Correct answer (ground truth): \{answer\} \\
+Model's full answer: \{output\} \\
+\\
+Perform these four steps and respond with a single JSON object only (no other text): \\
+\\
+1. **answer\_sentence**: The minimal phrase or clause from the model's answer that states the final answer, using the model's exact wording. Preserve the model's language so the final answer is visible in context. Do not include extra clauses that follow. \\
+2. **final\_answer**: Locate and extract the final answer to the question from the model's answer. Use as few words as possible (the first occurrence of the conclusive answer). \\
+3. **is\_correct**: true if the final answer is correct given the ground truth, false otherwise. \\
+4. **opposite\_answer**: Modify the answer sentence as little as possible to make a medically plausible alternative for the question. \\
+\\
+Respond only with valid JSON in this exact shape: \\
+\{"answer\_sentence": "...", "final\_answer": "...", "is\_correct": true or false, "opposite\_answer": "..."\} \\
+\\
+\\
+\{Stage 2: Prompt used in VQA answer difference localization.\} \\
+You are given two sentences that are the same except for some phrases. Your task is to identify the phrases in each sentence that differs from the other. \\
+\\
+Sentence A: \{sentence\_a\} \\
+Sentence B: \{sentence\_b\} \\
+\\
+Wrap only the differing phrases in \texttt{`<mask\>`} \texttt{`</mask\>`} tags. The differing phrases should be as short as possible.
+\end{tcolorbox}
+\caption{Prompt template used for VQA task answer localization and ground-truth incorporation.}
+\label{fig:prompt_stage1}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\begin{tcolorbox}[colback=boxgray, colframe=black!70, boxrule=0.5pt, arc=0mm, left=8pt, right=8pt, top=8pt, bottom=8pt]
+\small \ttfamily
+\{Stage 1: Prompt used in report generation modification\} \\ \\
+**Task:** Rewrite **Report A** to make a medically difficult preference pair. \\
+\\
+**Instruction:** \\
+* **Change Logic**: Use the facts in **Report B** to replace a few medical words in Report A to create a fine-grained preferred pair. \\
+* **all\_correct**: If all the facts in Report B are already present in Report A, change a few words yourself to make a rejected pair. \\
+\\
+**Constraints:** \\
+* **Structural Locking:** The format of Report A should be preserved. \\
+* **Token Parsimony:** At most **two or three words per sentence** can be changed. \\
+* **Clinical Significance:** The rejected response should be clinically different from Report A. Changing synonyms (\textit{e.g.} "clear" vs "normal", "healthy" vs "unremarkable") is not accepted. \\
+* **Output Format:** Return a JSON object containing keys `all\_correct` and `rewritten\_report\_a`. \\
+\\
+**Input Data:** \\
+* **Report A:** \{report\_a\} \\
+* **Report B:** \{report\_b\} \\
+\\
+\{Stage 2: Prompt used in report generation answer difference localization\} \\ \\
+CHEST\_MASK\_PROMPT = """Compare two reports and put the differing phrases inside \texttt{`<mask\>`} \texttt{`</mask\>`} tags. \\
+\\
+Output: \\
+Return **only** a valid JSON object with two keys: `report\_a\_masked` and `report\_b\_masked`. Each key should be a string with the differing phrases wrapped in \texttt{`<mask\>`} \texttt{`</mask\>`} tags. \\
+\\
+Report A: \\
+\{report\_a\} \\
+\\
+Report B: \\
+\{rewritten\_report\_a\} \\
+"""
+\end{tcolorbox}
+\caption{Prompt template used for the report generation task, answer localization and ground-truth incorporation.}
+\label{fig:prompt_stage2}
+\end{figure}
+
+\clearpage
+\subsection{Implementation Details and Asset Licenses}
+\label{app:impl}
+
+\begin{table}[ht]
+    \caption{Details of training hyperparameters.}
+    \label{tab:hyperparams}
+    \centering
+    \small
+    \begin{tabular}{lcc}
+        \toprule
+        & \textbf{HuatuoGPT-Vision-7B} & \textbf{Qwen3-VL-4B} \\
+        \midrule
+        Is medically SFT & \checkmark & $\times$ \\
+        Trainable module & \multicolumn{2}{c}{LoRA in LLM; everything else kept frozen} \\
+        LoRA setup & \multicolumn{2}{c}{rank=128, alpha=256, dropout=0.05} \\
+        Learning rate & 1e-6 & 1e-6 \\
+        Learning rate scheduler & Cosine & Cosine \\
+        Optimizer & AdamW & AdamW \\
+        Weight decay & 0.0 & 0.0 \\
+        Warmup ratio & 0.0 & 0.0 \\
+        Epochs & 1 & 1 \\
+        Batch size per GPU & 4 & 4 \\
+        Batch size (total) & 8 & 8 \\
+        $\beta$ (loss coefficient) & 0.1 & 0.1 \\
+        $\alpha$ (loss coefficient) & 0.01 & 0.01 \\
+        $\gamma$ (loss coefficient) & 0.1 & 0.1 \\
+        $\lambda$ (loss coefficient) & 0.5 & 0.5 \\
+        Memory optimization & unsloth & unsloth \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Training was performed on an H100 80GB GPU, while inference utilized two L40s.
+
+\noindent \textbf{Licenses of existing assets used.}
+\begin{itemize}
+    \item HuatuoGPT-Vision-7B (Apache License 2.0): \url{https://huggingface.co/FreedomIntelligence/HuatuoGPT-Vision-7B}
+    \item Qwen3-VL-4B-Instruct (Apache License 2.0): \url{https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct}
+\end{itemize}
+
+\clearpage
+\subsection{Additional Qualitative Cases}
+\label{app:cases}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{examples/example1.pdf}
+    \caption{Qualitative comparison on organ identification. The DPO-aligned model answers with a bare noun phrase, while \ourloss{} preserves the base model's explanatory register and its clinical content.}
+    \label{fig:case1}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{examples/example2.pdf}
+    \caption{Qualitative comparison on a negative finding. The base model elaborates a consolidation that is not present; \ourloss{} produces an explicit negative statement naming the supporting observation.}
+    \label{fig:case2}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{examples/example3.pdf}
+    \caption{Qualitative comparison on preservation of costophrenic angles.}
+    \label{fig:case3}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{examples/example4.pdf}
+    \caption{Qualitative comparison on lesion attribute description (ring enhancement).}
+    \label{fig:case4}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{examples/example5.pdf}
+    \caption{Qualitative comparison on paired-organ identification.}
+    \label{fig:case5}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{examples/example6.pdf}
+    \caption{Qualitative comparison on anatomical localization (laterality).}
+    \label{fig:case6}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{examples/example7.pdf}
+    \caption{Additional qualitative comparison across backbones.}
+    \label{fig:case7}
+\end{figure}
+
+\clearpage
+\subsection{Reproduction Guide}
+\label{app:repro}
+
+Table~\ref{tab:repro} maps the components described in this thesis onto the accompanying code release, so that each equation, figure, and table can be traced to the code that produced it.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Mapping from thesis content to the code release.}
+\label{tab:repro}
+\begin{tabular}{ll}
+\toprule
+\textbf{Thesis content} & \textbf{Code} \\
+\midrule
+Eq.~\ref{eq:firempo-rank} (dual-constraint ranking loss) & \texttt{fire\_mpo/trainer/fire\_mpo\_trainer.py} \\
+Eq.~\ref{eq:firempo-kl} (bidirectional token-wise KL) & \texttt{fire\_mpo/loss/fire\_mpo.py} \\
+Eq.~\ref{eq:firempo-total} (complete objective) & \texttt{FiReMPOTrainer.get\_batch\_loss\_metrics} \\
+\S\ref{sec:met:data} (on-policy preference construction) & \texttt{python -m fire\_mpo.pipeline.build\_text\_prefs} \\
+\S\ref{sec:met:corruption} (lesion-targeted corruption) & \texttt{fire\_mpo.pipeline.enrich\_medsam3\_prompt} \\
+ & then \texttt{fire\_mpo.pipeline.corrupt\_lesions} \\
+Table~\ref{tab:hyperparams} (hyperparameters) & \texttt{configs/fire\_mpo\_default.yaml} \\
+Tables~\ref{tab:regularizer}--\ref{tab:pair_ablation} (ablations) & \texttt{configs/ablations/} \\
+RRPO baseline & same trainer, $\gamma = 0$, $\lambda = 1$ \\
+MASK-DPO baseline & same trainer, $\gamma = 0$, $\alpha = 0$ \\
+\S\ref{sec:res:main} (VQA accuracy) & \texttt{scripts/baselines/evaluation.sh} \\
+\S\ref{sec:res:main} (GREEN score) & \texttt{scripts/baselines/green\_score.sh} \\
+\S\ref{sec:res:grounding} (VGMED grounding) & \texttt{scripts/baselines/visual\_grounding.sh} \\
+Figure~\ref{fig:training_dynamics} (training dynamics) & \texttt{thesis/images/new/make\_training\_dynamics.py} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Because RRPO and MASK-DPO are configurations of the same trainer rather than separate codebases, the only baseline requiring its own implementation is mDPO, which adds a distinct conditional-preference term to the DPO loss.

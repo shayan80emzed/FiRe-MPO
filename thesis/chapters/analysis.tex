@@ -1,0 +1,172 @@
+\section{Analyzing the Failure Modes of Preference Optimization in Clinical LVLMs}
+\label{section:analysis}
+
+The previous chapter established that preference optimization has become the dominant post-training tool for aligning large vision-language models, and that Direct Preference Optimization in particular owes its popularity to the elimination of an explicit reward model. This chapter argues that the standard formulation, transplanted unmodified into a clinical setting, is structurally mismatched to what clinical correctness actually requires.
+
+The argument proceeds in four parts. Section~\ref{sec:ana:coarse} shows that the sequence-level reward makes no distinction between the handful of tokens that determine a diagnosis and the surrounding boilerplate. Section~\ref{sec:ana:reward-hacking} shows that the standard workaround for expensive expert annotation --- substituting the supervised reference as the preferred response --- introduces a stylistic confound that the model learns to exploit instead of learning the clinical correction. Section~\ref{sec:ana:kl} shows that the direction of the KL regularizer, usually treated as an implementation detail, controls a coverage-precision trade-off that is decisive when factuality is the objective. Section~\ref{sec:ana:grounding} shows that none of these objectives contain any constraint tying a clinical assertion to the image region that supports it. Section~\ref{sec:ana:desiderata} collects the resulting requirements into a set of design desiderata, which Chapter~\ref{section:method} addresses one by one.
+
+\subsection{Preliminaries}
+\label{sec:ana:prelim}
+
+\subsubsection{Direct Preference Optimization}
+
+Given a vision-language pair $\{v, q\}$, DPO~\cite{rafailov2023direct} seeks to align the policy model $\pi_\theta$ by increasing the likelihood of a chosen response $y^+$ relative to a rejected one $y^-$. This alignment is achieved by maximizing the reward margin between $\pi_\theta$ and a fixed reference model $\pi_{\text{ref}}$ via the following objective:
+\begin{equation}\label{eq:dpo}
+\mathcal{L}_{\text{DPO}}(\pi_{\theta};\pi_{\text{ref}}) = -\mathbb{E} \left[ \log \sigma \left( r_\theta(v,q,y^+) - r_\theta(v,q,y^-) \right) \right],
+\end{equation}
+where the implicit reward is formulated as
+\begin{equation}\label{eq:dpo-reward}
+r_\theta(v,q,y) = \beta \log \frac{\pi_{\theta}(y \mid v,q)}{\pi_{\text{ref}}(y \mid v,q)}.
+\end{equation}
+Here, $\beta$ serves as a hyperparameter that controls the strength of the constraint toward the reference distribution.
+
+Two properties of this construction matter for what follows. The first is that the reward in Equation~\ref{eq:dpo-reward} is a \emph{sequence-level} quantity. Because $\log \pi_\theta(y \mid v, q) = \sum_t \log \pi_\theta(y_t \mid v, q, y_{<t})$, the implicit reward is a sum over every token position in the response, and the gradient of Equation~\ref{eq:dpo} distributes a single scalar coefficient uniformly across all of those positions. The optimizer has no mechanism for concentrating pressure on the tokens that actually differ between $y^+$ and $y^-$.
+
+The second is that the objective is defined entirely by the \emph{contrast} between the two responses. DPO does not reward $y^+$ for being correct in any absolute sense; it rewards $y^+$ for being more likely than $y^-$ under the reweighted policy. Any systematic property that separates the two responses --- clinical content, but equally length, register, or formatting --- is a valid direction for reducing the loss. Which property the model actually exploits is determined by how the preference pairs were constructed, not by the objective.
+
+These two properties are the root of the first two failure modes analyzed below. A third consequence, noted in prior work, is that the sequence-level formulation makes gradient magnitudes scale with response length, so long-form outputs such as radiology reports can produce disproportionately large updates. This volatility often leads $\pi_\theta$ to diverge, resulting in a loss of general capabilities and performance degradation~\cite{xu2024dpo, yan20243d, cho2025rethinking}.
+
+\subsubsection{Refined Regularized Preference Optimization}
+
+Several recent studies~\cite{sarkar2025self, gu2025mask, zeng2024token, zhu2025tgdpo} have proposed techniques to mitigate these limitations. In particular, RRPO~\cite{sarkar2025self} is effective in \textit{general-domain} vision tasks and is the closest antecedent of the method developed in this thesis. RRPO introduces a fine-grained alignment strategy that isolates and penalizes only the key differing tokens between $y^+$ and $y^-$ by minimizing the following training objective:
+\begin{equation}\label{eq:rrpo}
+\begin{split}
+\mathcal{L}_{\text{RRPO}}(\pi_{\theta};\pi_{\text{ref}}) = &
+-\mathbb{E}
+\biggl[
+\log \sigma \sum_{i} \left(r_\theta(v,q,y^+_i) - r_\theta(v,q,y^-_i)\right) \\
+& + \alpha \cdot \sum_{t} \mathbb{D}_{\text{KL}} \big(\pi_{\text{ref}}(t \mid v,q,y^+_{<t}) \parallel \pi_\theta(t \mid v,q,y^+_{<t}) \big)
+\biggr],
+\end{split}
+\end{equation}
+where $\{v, q, y^+\} \sim \mathcal{D}$ and $y^- \sim \texttt{T}(\pi_\theta(v', q))$, with $v'$ representing a randomly perturbed version of $v$, and $\texttt{T}$ indicating a template-matched version of $y^+$ that incorporates divergent concepts from $\pi_\theta(v', q)$.
+
+The index $i$ in the ranking term ranges over a selected subset of token positions rather than the whole response, which is what makes the reward assignment fine-grained. Because restricting the sum in this way also removes the implicit KL constraint that DPO inherits from Equation~\ref{eq:dpo-reward} on the unselected positions, RRPO reintroduces an explicit forward token-wise KL term. This ensures the model maintains its overall generative profile while applying localized penalties.
+
+RRPO therefore already resolves the coarseness problem in the general domain. However, three of its design choices do not transfer to clinical alignment, and the remainder of this chapter develops why.
+
+\subsection{Failure Mode I: Coarse Sequence-Level Rewards}
+\label{sec:ana:coarse}
+
+Clinical evaluation hinges on fine-grained correctness: exact terminology, accurate anatomical localization, correct laterality, and the presence or absence of a specific finding. A radiologist reading the sentence \emph{``the abnormality is located in the right lower lobe of the lung''} judges it almost entirely on two words. The remaining fifteen carry no diagnostic weight; they could be rephrased freely without changing the clinical content of the report.
+
+Standard DPO treats all response tokens uniformly during optimization. Consequently, diagnostically important spans such as findings, anatomical locations, and measurements contribute no more to the training signal than generic filler phrases such as ``the image shows'' or ``there is evidence of''. In a typical medical VQA response, the decisive span occupies a small fraction of the total token count, so the gradient signal is dominated by tokens that are identical in the preferred and rejected responses and therefore carry no information about the preference at all.
+
+Figure~\ref{fig:framework_overview} makes this visible. The token-level implicit reward assigned by a DPO-aligned model spreads almost uniformly across the response; the words \emph{``left lung''}, which are the entire reason the preferred answer is preferred, receive no more reward than the phrase \emph{``the abnormality is''}. \ourloss{}, by contrast, concentrates reward on precisely those tokens.
+
+The mechanism is explicit in the gradient derived in Section~\ref{sec:bg:alignment}. Reproducing Equation~\ref{eq:dpo-gradient},
+\begin{equation*}
+\nabla_\theta \mathcal{L}_{\text{DPO}} = -\beta\,\sigma(-\Delta)\,\Big[\nabla_\theta \log \pi_\theta(y^+ \mid v,q) - \nabla_\theta \log \pi_\theta(y^- \mid v,q)\Big],
+\end{equation*}
+and expanding each log-probability into its per-token sum, every token position in the response receives the identical scalar coefficient $\beta\sigma(-\Delta)$. There is no term anywhere in the objective that depends on \emph{which} position is being updated. If $y^+$ and $y^-$ share twenty-eight of thirty tokens, the gradients from those twenty-eight positions do not cancel to nothing --- they are gradients of the same tokens under different conditioning contexts, so they contribute real but uninformative updates, diluting the two positions that carry the clinical distinction.
+
+A useful way to see the severity is to consider what fraction of the update is informative. For a typical SLAKE response of roughly thirteen tokens (Section~\ref{sec:res:style-gap}) in which the clinical correction spans one or two, the informative share is on the order of ten percent, and for a multi-sentence radiology report in which a single finding has been altered it is smaller still. The objective is not wrong, merely inefficient in a way that scales badly with response length --- which predicts that the damage should be worst on report generation and mildest on short closed-form answers. Section~\ref{sec:res:main} confirms exactly this ordering in the size of the gains from repairing it.
+
+The practical consequence is a poor signal-to-noise ratio. The model must infer, from a scalar preference over two long sequences, which of the many differences between them was the intended one. When the sequences differ in only a few tokens, this is recoverable; when they differ in style as well as content, it is not --- which is the subject of the next section. This is consistent with the observation that DPO-based approaches yield inconsistent gains over supervised fine-tuning in the medical domain~\cite{kim2026benchmarking}: the pairwise preference format is simply too coarse to carry the feedback clinicians actually provide.
+
+\subsection{Failure Mode II: Stylistic Reward Hacking}
+\label{sec:ana:reward-hacking}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.85\textwidth]{reward_hacking_plot.pdf}
+    \caption{Stylistic shift versus medical accuracy. Using the ground truth as the preferred response causes the model to mimic the length of the rewarded answer instead of improving clinical precision, which shows itself in both the final generation and during training. (a) The medical accuracy of the aligned model compared against its generation length. (b) Reward accuracy measures the fraction of preference pairs for which the implicit DPO reward assigns a higher score to the preferred response than to the rejected response.}
+    \label{fig:reward_hacking_analysis}
+\end{figure}
+
+In medical DPO, expert preference annotation is often prohibitively expensive, and AI-generated preference labels are unreliable in this domain: large language models used as judges disagree with clinicians in systematic ways~\cite{delucia2026same, rankin2020reliability}. A common alternative is therefore to use the fixed SFT reference response as the preferred answer~\cite{puli2024raddpo, zhu2024mmedpo, liu2025rrg, savage2025fine}.
+
+This construction introduces an off-policy distribution shift~\cite{yang2025mitigating}. Ground-truth medical responses have a characteristic style: they are short, structured, and written in the clipped register of a clinical note. Model responses are typically longer and more explanatory, hedged with qualifications and framed with conversational scaffolding. The two occupy visibly different regions of the space of possible answers. Because DPO optimizes a contrast rather than an absolute notion of correctness, this style gap becomes a second, much stronger signal separating $y^+$ from $y^-$ --- one that is far easier to learn than the clinical distinction. This can confound clinical correctness with response style, a failure mode we refer to as \emph{stylistic reward hacking}.
+
+The issue is particularly acute in clinical alignment because the decisive difference between two responses is often localized to a small span: an anatomical side, a lesion attribute, or an abnormality label. If the preferred and rejected responses also differ in length, syntax, and format, then the clinical difference is one signal among many, and the optimization signal no longer isolates the clinically meaningful error. The model can drive the preference margin arbitrarily high by learning ``be terse and use clinical register'' while leaving its diagnostic behaviour untouched.
+
+Figure~\ref{fig:reward_hacking_analysis} illustrates this effect by comparing model outputs and reward accuracy under \texttt{off-policy} and \texttt{on-policy} preference construction. The diagnostic is the divergence between two curves that ought to move together. Reward accuracy --- the fraction of preference pairs for which the implicit DPO reward correctly ranks $y^+$ above $y^-$ --- measures how well the model has satisfied the training objective. Medical accuracy measures whether it answers clinical questions correctly. Under off-policy DPO, high reward accuracy together with low medical accuracy indicates reward hacking: the model becomes better at satisfying the preference objective without necessarily correcting the clinically relevant visual finding. The generation-length panel identifies the mechanism, showing the aligned model's outputs collapsing toward the length of the ground-truth references. In contrast, on-policy preference construction keeps the response style closer to the model's own outputs, so the two curves track each other.
+
+This suggests a remedy that does not require expert annotation. If the preferred and rejected responses are drawn from the same stylistic distribution --- specifically, if both are the model's own generations and differ only where a clinical span was edited --- then style is held constant by construction and the only remaining signal is the clinical one. This is the principle behind the on-policy preference construction developed in Section~\ref{sec:met:data}, and it is validated empirically in Section~\ref{sec:res:abl-style}.
+
+\subsection{Failure Mode III: The Geometry of the KL Regularizer}
+\label{sec:ana:kl}
+
+In clinical alignment, the choice of regularizer $\mathbb{D}_{\text{KL}}$ determines how the updated policy $\pi_\theta$ trades off distributional coverage against precision. Although the standard $\mathcal{L}_{\text{RRPO}}$ utilizes a forward token-wise KL (FKL) to anchor the policy to the base model, the distributional characteristics of the regularizer are critical for high-stakes medical factuality. The two directions are not interchangeable, and neither is sufficient alone.
+
+\subsubsection{Forward KL: Coverage at the Cost of Precision}
+
+The forward term $\mathbb{D}_{\text{KL}}(\pi_{\text{ref}} \parallel \pi_\theta)$ minimizes the divergence by ensuring that $\pi_\theta$ places probability mass wherever the reference $\pi_{\text{ref}}$ does. At the token level $y_t$, the optimization behaves as:
+\begin{equation*}
+\begin{split}
+\arg \min_{\theta} D_{FKL} &= \arg \min_{\theta} D_{KL}(\pi_{\text{ref}} \parallel \pi_\theta) \\
+&= \arg \min_{\theta} \mathbb{E}_{y \sim \pi_{\text{ref}}} \left[ \log \frac{\pi_{\text{ref}}(y \mid x)}{\pi_\theta(y \mid x)} \right] \\
+&= \arg \max_{\theta} \mathbb{E}_{y \sim \pi_{\text{ref}}} [\log \pi_\theta(y \mid x)].
+\end{split}
+\end{equation*}
+
+The final line is maximum likelihood estimation of the policy under samples drawn from the reference. Its behaviour follows from the asymmetry of the integrand: the objective is infinite wherever $\pi_{\text{ref}}$ has mass and $\pi_\theta$ does not, but finite --- and bounded --- wherever $\pi_\theta$ has mass and $\pi_{\text{ref}}$ does not. Forward KL therefore punishes the policy for \emph{dropping} modes and is indifferent to the policy \emph{adding} them. This requires $\pi_\theta$ to cover all modes of the reference model. In a medical context, this ensures the model retains the linguistic variety and general clinical knowledge of the base model. However, it can also force the model to preserve low-precision modes --- including exactly those hallucination-prone continuations that alignment was meant to remove.
+
+\subsubsection{Reverse KL: Precision at the Cost of Diversity}
+
+The reverse term $\mathbb{D}_{\text{KL}}(\pi_\theta \parallel \pi_{\text{ref}})$ (RKL) encourages $\pi_\theta$ to concentrate its mass on the high-probability regions of the reference. The objective can be decomposed as:
+\begin{equation*}
+\begin{split}
+\arg \min_{\theta} D_{RKL} &= \arg \min_{\theta} D_{KL}(\pi_\theta \parallel \pi_{\text{ref}}) \\
+&= \arg \min_{\theta} \mathbb{E}_{y \sim \pi_\theta} \left[ \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)} \right] \\
+&= \arg \max_{\theta} \mathbb{E}_{y \sim \pi_\theta} [\log \pi_{\text{ref}}(y \mid x)] + \mathcal{H}(\pi_\theta(y \mid x)).
+\end{split}
+\end{equation*}
+
+The decomposition, given as Equation~\ref{eq:rkl-decomp} in Section~\ref{sec:bg:kl}, separates two competing pressures. The first term rewards the policy for placing mass where the reference finds it likely; the second, the entropy of the policy, opposes total collapse onto a single mode. The expectation is taken under $\pi_\theta$ rather than $\pi_{\text{ref}}$, which is what makes RKL an \emph{on-policy} regularizer: it evaluates the reference only at points the current policy actually visits. By maximizing the log-probability of the reference under the current policy's samples, it penalizes the model for straying into regions of the token space that the reference model finds unlikely. This tail-suppression is vital for medical LVLMs, as it prevents the model from generating spuriously attractive but clinically incorrect tokens --- the fluent, confident, wrong continuation is precisely a low-reference-probability region that forward KL would leave untouched.
+
+\subsubsection{The Case for a Bidirectional Regularizer}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.55\textwidth]{KL_PLOT.pdf}
+    \caption{Comparison of Pass@1 versus Pass@4 across different regularization strategies. The bidirectional KL (FKL+RKL) achieves the highest clinical precision while maintaining the distributional richness required for complex reasoning.}
+    \label{fig:tkl_rtkl_comparison}
+\end{figure}
+
+Figure~\ref{fig:tkl_rtkl_comparison} analyzes the resulting trade-off between distributional coverage and clinical precision. The two axes are chosen to separate the two effects: Pass@1 measures the precision of the single most likely answer, while Pass@4 measures whether a correct answer appears anywhere among four samples and is therefore sensitive to a collapse in output diversity. A regularizer that improves precision by narrowing the output distribution will raise Pass@1 while flattening or reducing Pass@4.
+
+Samples are drawn with temperature $0.7$ and nucleus sampling at $p = 0.9$; Pass@4 therefore reflects the diversity of the model's output distribution under a standard decoding configuration rather than under an artificially flattened one.
+
+This is what the isolated variants exhibit. While RKL enforces high-precision outputs, its mode-seeking nature often triggers a collapse into repetitive responses. Conversely, FKL acts as a necessary safeguard, anchoring the model to the diverse reasoning traces and linguistic richness of the base policy, at the cost of retaining low-precision modes. The results suggest that optimization under either force in isolation is insufficient for high-stakes medical alignment. A balanced regularization ensures the policy achieves rigorous clinical accuracy without sacrificing the interpretive variety that is essential for complex medical reasoning.
+
+\subsection{Failure Mode IV: The Absence of Grounding Constraints}
+\label{sec:ana:grounding}
+
+The three failure modes above all concern the textual side of the objective. A fourth is orthogonal to them: none of Equations~\ref{eq:dpo} or~\ref{eq:rrpo} contains any term that ties a clinical assertion to the image evidence supporting it.
+
+This matters because a vision-language model has two routes to a correct answer. It can read the image, or it can exploit a linguistic prior --- base rates over findings, correlations between question phrasing and answer, or the anatomical defaults of the modality. Both routes produce the same token sequence, and a purely textual preference objective rewards both identically. A model that answers ``left lung'' because the lesion is visibly on the left and a model that answers ``left lung'' because that answer is more common in the training distribution are indistinguishable to Equation~\ref{eq:dpo}. Alignment on such an objective can therefore increase measured accuracy while leaving --- or even worsening --- the model's actual dependence on visual evidence.
+
+Figure~\ref{fig:framework_overview} shows this directly. The DPO-aligned model produces the correct answer, but its visual attention remains as diffuse as the unaligned base model's; the correction was learned as a textual association, not as a grounding improvement. The layer-wise measurements in Section~\ref{sec:res:grounding} confirm the pattern quantitatively across both backbones.
+
+Existing multimodal preference methods do introduce image-side signal, but typically through coarse global perturbations --- cropping, whole-image noise, or blacking out the image entirely. These are too blunt for the clinical case. Removing the entire image tests whether the model uses vision at all, which is a much weaker property than whether it uses the \emph{diagnostically decisive region}. A model can retain a globally sensible reading of a chest radiograph while being completely insensitive to the small focal opacity that determines the answer. Isolating that sensitivity requires perturbing the lesion specifically while leaving the rest of the anatomy intact, and the ablation in Section~\ref{sec:res:abl-visual} quantifies how much this distinction is worth.
+
+\subsection{Why the Four Failures Compound}
+\label{sec:ana:compound}
+
+The four failure modes have been presented separately, but the central claim of this thesis is that in a clinical setting they interact, and that this interaction explains why addressing any one in isolation yields the inconsistent gains reported in the literature~\cite{kim2026benchmarking}.
+
+Three couplings matter.
+
+\textbf{Coarse rewards and stylistic confounds reinforce each other.} A fine-grained reward is a mechanism for concentrating the training signal on the tokens that carry the clinical distinction. That mechanism is worthless if a stylistic feature separates the preference pair more reliably than the clinical content does, because the model will exploit the easier feature first, and the gradient will vanish before the harder distinction is ever engaged. Conversely, style-matched pairs deliver much less benefit under a sequence-level reward, since the informative difference is then a small fraction of a signal that is spread uniformly across the response. The two remedies are close to useless apart and complementary together.
+
+\textbf{Localizing the reward destabilizes the policy unless the regularizer is restored.} As Section~\ref{sec:bg:alignment} showed, DPO's KL constraint lives entirely inside the implicit reward's $\pi_{\text{ref}}$ denominator. Restricting the ranking loss to selected positions therefore removes the constraint everywhere else, leaving the policy free to drift on the majority of the response --- the very positions the fine-grained reward has decided not to supervise. This is not a hypothetical: Section~\ref{sec:res:abl-kl} shows a $22$-point collapse on report generation in exactly this configuration. Fine-grained rewards and an explicit regularizer are not two independent improvements but two halves of one change.
+
+\textbf{Neither textual remedy touches grounding.} Both of the couplings above concern which tokens the objective supervises and how the pairs are built. Neither says anything about whether the model consulted the image. A method could fix both and still produce a model that has merely learned better linguistic associations, which is what the DPO grounding curves in Section~\ref{sec:res:grounding} appear to show. Grounding is orthogonal to the textual failures, which is precisely why it needs a separate term rather than better textual supervision.
+
+The practical implication is that an ablation table, which by construction removes one component at a time, systematically understates the value of the combination. Section~\ref{sec:res:abl-visual} finds that removing the visual term costs only $0.38$ points on average --- but that measurement is taken with the fine-grained reward, the style-matched pairs, and the regularizer all still in place. The relevant comparison for the thesis as a whole is not any single ablation but the gap between the full method and standard DPO, which is $5.25$ points on HuatuoGPT.
+
+\subsection{Design Desiderata}
+\label{sec:ana:desiderata}
+
+The four analyses above translate into four requirements on an alignment objective for medical LVLMs. Chapter~\ref{section:method} addresses each in turn.
+
+\begin{itemize}
+    \item \textbf{D1. Localized reward assignment.} The training signal must be concentrated on the clinically decisive spans that distinguish $y^+$ from $y^-$, rather than distributed uniformly over the response. \emph{Addressed by the fine-grained ranking loss, Section~\ref{sec:met:ranking}.}
+
+    \item \textbf{D2. Style-invariant preference pairs.} The preferred and rejected responses must be drawn from the same stylistic distribution, so that the only systematic difference between them is clinical. \emph{Addressed by on-policy minimal-edit construction, Section~\ref{sec:met:data}.}
+
+    \item \textbf{D3. Bidirectional regularization.} The regularizer must simultaneously suppress low-probability incorrect tails and preserve the base model's coverage, which neither KL direction achieves alone. \emph{Addressed by the bidirectional token-wise KL, Section~\ref{sec:met:kl}.}
+
+    \item \textbf{D4. Explicit evidence grounding.} The objective must contain a term that penalizes confident answers produced without the supporting visual evidence, at the granularity of the lesion rather than the whole image. \emph{Addressed by the dual-constraint ranking loss over lesion-corrupted images, Sections~\ref{sec:met:corruption} and~\ref{sec:met:ranking}.}
+\end{itemize}

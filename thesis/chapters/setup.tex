@@ -1,0 +1,135 @@
+\section{Experimental Setup}
+\label{section:setup}
+
+\subsection{Base Models}
+\label{sec:exp:models}
+
+We evaluate \ourloss{} using two state-of-the-art open-source backbones, chosen so that the two ends of the medical-specialization spectrum are both represented.
+
+\texttt{HuatuoGPT-Vision-7B}~\cite{chen2024towards} is a specialized medical LVLM pre-trained on extensive medical image-text pairs, making it a strong domain-specialized backbone for clinical vision-language alignment. Because it has already absorbed a large amount of medical visual knowledge, it tests whether fine-grained alignment still adds value on top of domain pretraining.
+
+\texttt{Qwen3-VL-4B-Instruct}~\cite{bai2025qwen3} is a highly efficient multimodal model that utilizes a sophisticated visual-language adapter for high-resolution image perception, providing a robust baseline for assessing both medical-specific and general-purpose multimodal alignment capabilities. It has had no medical pretraining, so it tests whether the method can install clinical behaviour rather than merely refine it.
+
+The pair is also informative because they differ in scale ($7$B versus $4$B), so consistent gains across both are evidence that the method is not exploiting a property of one particular model.
+
+\subsection{Datasets}
+\label{sec:exp:datasets}
+
+We utilize three benchmark datasets that span diverse clinical modalities and tasks.
+
+\textbf{VQA-RAD}~\cite{lau2018dataset} is a manually constructed dataset containing $315$ radiology images of the head, chest, and abdomen, paired with $3{,}515$ professional-grade question-answer pairs. We utilize the full dataset, encompassing both open-ended and binary ``yes/no'' queries. It is the smallest of the three and the most clinically authoritative, since every question was written by a physician.
+
+\textbf{SLAKE}~\cite{liu2021slake} is a semantically-labelled bilingual dataset featuring $642$ images and over $14{,}000$ QA pairs. For our experiments, we utilize only the English portion of the dataset and focus on the visual-textual pairs, without incorporating the semantic labels or the medical knowledge graph. This restriction is deliberate: the knowledge graph would supply structured clinical information that our pipeline is meant to derive from the image and the ground-truth answer alone.
+
+\textbf{IU-Xray}~\cite{demner2016preparing} comprises $7{,}470$ dual-view chest X-ray images and $3{,}955$ corresponding reports, and is used for clinical report generation. It exercises a different regime from the two VQA datasets: outputs are long-form and contain many independent clinical assertions, which is precisely the setting in which sequence-level rewards are weakest.
+
+Table~\ref{tab:splits} records the split sizes actually used. All evaluation is conducted on the standard in-distribution test split of each dataset.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Dataset splits used for training and evaluation. SLAKE counts are for the English subset only. VGMED is evaluation-only.}
+\label{tab:splits}
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{Dataset} & \textbf{Train} & \textbf{Val} & \textbf{Test} & \textbf{Task} \\
+\midrule
+SLAKE (English)  & 4{,}919 & 1{,}053 & 1{,}061 & VQA (416 closed / 645 open) \\
+VQA-RAD          & 1{,}793 & --      & 451     & VQA (closed and open) \\
+IU-Xray          & 2{,}069 & 296     & 590     & Report generation \\
+\midrule
+VGMED (loc)      & --      & --      & 1{,}388 & Grounding \\
+VGMED (att)      & --      & --      & 1{,}388 & Grounding \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Preference Corpus Statistics}
+\label{sec:exp:corpus}
+
+Because the preference corpus is generated per backbone --- the responses are sampled from the model being aligned --- each backbone has its own dataset, and the two differ in size and composition. Table~\ref{tab:corpus} reports the resulting corpora, which are not characterized in the original paper.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{On-policy preference corpora produced by the pipeline of Section~\ref{sec:met:data}, one per backbone and dataset. \emph{Pairs} is the number of preference records; \emph{With $v'$} is the number that carry a corrupted image and therefore contribute to the visual term; \emph{Already correct} is the share of records where the model's own sampled response was clinically correct, so the rejected member was generated as a counterfactual rather than the preferred member being repaired.}
+\label{tab:corpus}
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Backbone} & \textbf{Dataset} & \textbf{Pairs} & \textbf{With $v'$} & \textbf{Already correct} \\
+\midrule
+\multirow{3}{*}{HuatuoGPT-Vision-7B}
+ & SLAKE   & 4{,}888 & 4{,}888 & 57.4\% \\
+ & VQA-RAD & 1{,}786 & 1{,}786 & 59.7\% \\
+ & IU-Xray & 2{,}015 & 1{,}996 & 29.1\% \\
+\midrule
+\multirow{3}{*}{Qwen3-VL-4B-Instruct}
+ & SLAKE   & 4{,}902 & 4{,}877 & 63.4\% \\
+ & VQA-RAD & 1{,}792 & 1{,}785 & 55.4\% \\
+ & IU-Xray & 2{,}026 & 1{,}954 & 26.8\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two observations follow from this table. First, the corpora are close in size to the underlying training splits, confirming that the pipeline retains nearly every source example rather than discarding the ones it cannot process; the small shortfall in the \emph{With $v'$} column corresponds to records for which no corrupted image could be produced, and those records still contribute their textual preference through the first term of Equation~\ref{eq:firempo-rank}.
+
+Second, the \emph{Already correct} column shows that the two branches of the construction are both heavily used, and in a task-dependent way. On the VQA datasets the models were already correct on roughly $55$--$63\%$ of examples, so the majority of pairs are formed by generating a plausible counterfactual as $y^-$. On report generation the figure drops to under $30\%$, reflecting that a long report is far less likely to be entirely free of clinical error than a short answer. Without the counterfactual branch described in Section~\ref{sec:met:data}, roughly $60\%$ of the VQA training signal would simply not exist.
+
+The corrupted images themselves are \emph{model-agnostic}: corruption depends only on the image and the clinical concept named by the query, not on which policy generated the response. Each dataset's corrupted image set is therefore constructed once and reused across both backbones, which is why the two rows of Table~\ref{tab:corpus} for a given dataset draw on the same pool of $v'$ images.
+
+Table~\ref{tab:corruption_paths} records which corruption path each dataset took. Two of the three are handled by the lesion-targeted procedure of Section~\ref{sec:met:corruption}, with fallbacks where no concept prompt could be extracted or MedSAM3 returned no detection. Report generation is different by design: an IU-Xray prompt asks for a description of the whole study rather than about one localized finding, so there is no single query-relevant region to segment, and holistic image-level noise is used throughout.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Corruption path by dataset. Corruption is model-agnostic, so these counts apply to both backbones. \emph{Lesion-targeted} is the procedure of Section~\ref{sec:met:corruption}; \emph{no prompt} and \emph{no detection} are the two fallbacks to global noise. IU-Xray uses holistic noise by design, since a report-generation query has no single localized region of interest.}
+\label{tab:corruption_paths}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Dataset} & \textbf{Images} & \textbf{Lesion-targeted} & \textbf{No prompt} & \textbf{No detection} \\
+\midrule
+SLAKE   & 4{,}888 & 3{,}129 (64.0\%) & 1{,}585 (32.4\%) & 174 (3.6\%) \\
+VQA-RAD & 1{,}786 & 1{,}001 (56.0\%) & 615 (34.4\%)     & 170 (9.5\%) \\
+IU-Xray & 2{,}050 & --- (by design)  & 2{,}050 (100\%)  & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The lesion-targeting rate on the two VQA datasets is worth stating plainly, because it qualifies the ablation of Section~\ref{sec:res:abl-visual}. Roughly a third of SLAKE records and a third of VQA-RAD records receive global rather than localized corruption, so the reported advantage of lesion-targeted corruption is achieved with only about $60\%$ of the corpus actually receiving that treatment. If anything this understates the effect of localization, since the comparison in Table~\ref{tab:corruption} contrasts a partially-localized corpus against a fully global one.
+
+\subsection{Baselines}
+\label{sec:exp:baselines}
+
+We compare \ourloss{} against four preference-optimization baselines, selected to isolate the contribution of its two main design choices --- fine-grained textual preference optimization and explicit visual grounding.
+
+\textbf{DPO}~\cite{rafailov2023direct} serves as the sequence-level preference-learning baseline: no fine-grained reward, no visual preference.
+
+\textbf{mDPO}~\cite{wang2024mdpo} extends the DPO loss by incorporating a visual preference component, and therefore isolates the effect of adding image-side signal without fine-grained textual rewards.
+
+\textbf{RRPO}~\cite{sarkar2025self} and \textbf{MASK-DPO}~\cite{gu2025mask} introduce more localized textual preference signals, with RRPO additionally using a regularization term to constrain the updated policy relative to the reference model. These isolate the converse: fine-grained text without visual grounding.
+
+RRPO and MASK-DPO are realized as configurations of the same fine-grained trainer rather than as separate implementations, which removes implementation differences as a confound. RRPO is recovered by setting $\gamma = 0$ (no visual term) and $\lambda = 1$ (forward KL only). MASK-DPO is recovered by additionally setting $\alpha = 0$, which switches the regularizer off entirely and leaves localized rewards alone. A practical consequence, discussed in Section~\ref{sec:res:abl-kl}, is that the MASK-DPO baseline and the \emph{w/o KL} ablation are the same trained model viewed from two directions.
+
+The four together span the two-by-two design space, which is why Table~\ref{tab:results_loss_updated} annotates every row with whether it uses fine-grained text preferences and whether it uses image preferences. All four are trained and evaluated under the same protocol, on the same preference corpora, with the same backbones.
+
+For additional context, we also report published results from recent medical alignment methods, including MMedPO~\cite{zhu2024mmedpo}, FiSAO~\cite{cui2024fine}, and STLLaVA-Med~\cite{sun2024self}, where available. These are quoted from their original papers rather than reproduced, and are therefore not directly comparable --- they use different backbones and evaluation protocols. They are included to situate the absolute numbers, not to support a head-to-head claim.
+
+\subsection{Evaluation Protocol and Metrics}
+\label{sec:exp:metrics}
+
+For the Med-VQA and report generation tasks, all evaluations are conducted on the standard in-distribution test splits of their respective datasets.
+
+\textbf{Medical VQA accuracy.} For VQA-RAD and SLAKE, we report accuracy separately for Closed (binary or categorical) and Open (free-form) questions. Free-form medical answers cannot be scored by exact string match --- ``left lung'' and ``the lesion is in the left lung'' are the same answer --- so, given the question, its ground truth, and the corresponding model response, \texttt{GPT-4o-mini} is used as the judge. The separation of closed and open accuracy matters because the two probe different things: closed questions are susceptible to being answered correctly by chance or by prior, while open questions require the model to produce the clinical content itself.
+
+\textbf{Report quality.} For medical semantic consistency on IU-Xray, we utilize the GREEN score~\cite{ostmeier2024green}, a specialized metric that prioritizes medical correctness over surface-level n-gram overlap, reporting the accuracy, precision, and recall of the generated report against the ground-truth test set. Conventional n-gram metrics are actively misleading for this task, since a report can be lexically close to the reference while inverting the clinical finding.
+
+\textbf{Visual grounding.} To assess visual grounding, we evaluate on VGMED~\cite{liu2026vgmed}, a grounding-centric benchmark built by its authors over a subset of SLAKE, designed specifically to measure a model's sensitivity to subtle yet diagnostically decisive pathological features. Grounding evaluation is therefore confined to this VGMED SLAKE subset: the protocol requires per-question region annotations, which exist only for the images VGMED curates. Following the benchmark's protocol, we measure the Attention Ratio (AR)~\cite{khayatkhoei2025mllms}, KL divergence, and Jensen-Shannon (JS) divergence specifically on critical clinical tokens, in two subsets: Localization and Attribute. All three are computed per decoder layer, which is what allows the layer-wise analysis in Section~\ref{sec:res:grounding}; measuring only at the output layer would conceal where in the network the grounding difference emerges.
+
+\subsection{Implementation Details}
+\label{sec:exp:impl}
+
+Following standard preference learning protocols, we utilize Low-Rank Adaptation (LoRA) for efficient fine-tuning~\cite{hu2022lora}, applied exclusively to the LLM component while the vision encoder and cross-modal projectors remain frozen. We use a cosine decay scheduler and a global batch size of $8$, training for a single epoch.
+
+For the data construction pipeline, we utilize \texttt{GPT-4o-mini} for VQA extraction and \texttt{Gemini 3 Flash Preview} for report refinement, with the prompts given in Appendix~\ref{app:prompts}. We ensure that only the clinical accuracy has changed, without a change to the targeted model response style. Fine-grained corrupted image samples are constructed by first using MedSAM3-v1~\cite{liu2025medsam3}, a purely text-guided medical segmentation model, to obtain the localized segmentations, and then adding targeted noise on the specific clinical concepts.
+
+Default hyperparameters are $\lambda = 0.5$, $\alpha = 0.01$, $\gamma = 0.1$, and $\beta = 0.1$. The complete configuration, including LoRA rank and optimizer settings, is given in Appendix~\ref{app:impl}. Training was performed on an H100 80GB GPU, while inference utilized two L40s.

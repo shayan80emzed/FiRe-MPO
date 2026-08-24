@@ -1,0 +1,160 @@
+%%%%%%%%%%%%%%%
+% MSc Thesis — York University, Department of Electrical Engineering and Computer Science
+%
+% Formatting is inherited from an accepted York EECS MSc thesis template
+% (Yasaman Parhizkar's adaptation of Manvi Agarwal's Groningen template).
+% FGS does not publish an official LaTeX class; this template is the working authority.
+%
+% Author: Shayan Mohammadizadehsamakosh
+%%%%%%%%%%%%%%%
+
+\documentclass[letterpaper,11pt]{article}
+
+% ---- Core packages (inherited from the York template) ----
+\usepackage{setspace}
+\usepackage{comment}
+\usepackage{multirow}
+\usepackage[font=small]{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{color}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{amssymb}
+\usepackage{wrapfig}    % inline figures
+\usepackage{enumitem}
+\usepackage{graphicx}   % images
+\usepackage{here}       % forced figure placement
+\usepackage{pslatex}    % PostScript fonts
+\usepackage{fancyhdr}
+\usepackage{float}
+% [numbers] is required: \bibliographystyle{ieeetr} is a numeric style, and
+% natbib's default author-year mode errors out against it.
+\usepackage[numbers]{natbib}
+\usepackage[nottoc,notlof]{tocbibind}
+\usepackage{pifont}     % \ding
+\newcommand{\cmark}{\ding{51}}   % check mark
+\newcommand{\xmark}{\ding{55}}   % cross mark
+
+\usepackage{tcolorbox}  % boxed environments (prompt templates)
+\tcbuselibrary{listings, breakable, skins}
+\usepackage[hidelinks]{hyperref}
+\usepackage{tocloft}
+\usepackage{titlesec}
+\usepackage{fmtcount}
+\usepackage{etoolbox}
+\usepackage{titletoc}
+
+% ---- Additional packages carried over from the paper source ----
+\usepackage[T1]{fontenc}
+\usepackage{url}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xspace}
+\usepackage{afterpage}
+\usepackage{courier}
+\usepackage[table]{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{listings}
+
+% ---- Geometry: equal margins ----
+\usepackage[
+	top    = 25mm,
+	bottom = 25mm,
+	left   = 25mm,
+	right  = 25mm]{geometry}
+
+% The template suppresses paragraph indentation. Typographically a paragraph break
+% must be marked by either an indent or vertical space, so with \parindent at 0pt a
+% \parskip is required -- without it consecutive paragraphs run together and the
+% structure of the argument becomes invisible. The rubber component lets the page
+% breaker absorb slack rather than leaving short pages.
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55\baselineskip plus 0.2\baselineskip minus 0.1\baselineskip}
+% Keep lists tight so the added \parskip does not make them sprawl.
+\setlist{topsep=0.25\baselineskip, itemsep=0.15\baselineskip, parsep=0pt}
+\renewcommand{\refname}{Bibliography}
+\graphicspath{{images/}{images/paper/}{images/new/}}
+\input{defs}
+
+\definecolor{darkgreen}{rgb}{0.0, 0.5, 0.0}
+\definecolor{darkred}{rgb}{0.5, 0.0, 0.0}
+\definecolor{boxgray}{RGB}{240, 240, 240}
+
+% ---- A numbered \subsubsubsection level under \subsubsection ----
+\titleclass{\subsubsubsection}{straight}[\subsubsection]
+\newcounter{subsubsubsection}[subsubsection]
+\renewcommand\thesubsubsubsection{\thesubsubsection.\arabic{subsubsubsection}}
+\titleformat{\subsubsubsection}
+  {\normalfont\normalsize\bfseries}
+  {\thesubsubsubsection}{1em}{}
+\titlespacing*{\subsubsubsection}
+  {0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{4}
+
+\onehalfspacing
+\begin{document}
+
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{4}
+
+\pagenumbering{roman}
+\begin{center}
+    % Institutional logos. Drop the two files into images/logos/ as
+    % lassonde.png and yorku.png (PDF or JPG also work -- adjust the extension
+    % below). \IfFileExists guards the build so the title page still typesets
+    % if they are absent.
+    \vspace*{0.5cm}
+    \IfFileExists{images/logos/lassonde.png}{%
+      \raisebox{-0.5\height}{\includegraphics[height=1.5cm]{images/logos/lassonde.png}}%
+      \hspace{1.2cm}%
+    }{}%
+    \IfFileExists{images/logos/yorku.png}{%
+      \raisebox{-0.5\height}{\includegraphics[height=1.5cm]{images/logos/yorku.png}}%
+    }{}%
+    \par
+    \vspace{2.5cm}
+    {\bf{\Large Analyzing and Improving Fine-grained Preference\\[0.3cm]
+    Optimization in Medical Vision-Language Models}}\\
+    \vspace{1cm}{\bf \large Shayan Mohammadizadehsamakosh}\\
+    \vspace{2cm}{\bf A Thesis Submitted to the Faculty of Graduate Studies\\
+    In Partial Fulfillment of the Requirements\\
+    for the Degree of Master of Science}\\
+    \vspace{0.5cm}{\bf Graduate Program in Computer Science}\\
+    \vspace{2cm} {\bf {\large York University}}\\
+    {\bf {\large Toronto, Ontario}}\\
+    \vspace{2cm} {\textbf{\thesisdate}}\\
+    {\bf \copyright Shayan Mohammadizadehsamakosh, \thesisyear}
+\end{center}
+\thispagestyle{empty}
+
+\newpage
+\include{chapters/abstract}
+\include{chapters/contents}
+
+\ifdraft
+\newpage
+\listoftodos[\textbf{Outstanding Items (draft only)}]
+\fi
+
+\newpage
+\pagenumbering{arabic}
+\include{chapters/introduction}
+\include{chapters/background}
+\include{chapters/related}
+\include{chapters/analysis}
+\include{chapters/method}
+\include{chapters/setup}
+\include{chapters/results}
+\include{chapters/conclusion}
+
+\bibliographystyle{ieeetr}
+\bibliography{biblio}
+
+\include{chapters/appendix}
+
+\end{document}

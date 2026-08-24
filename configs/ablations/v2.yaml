@@ -1,0 +1,7 @@
+# Table 4: + v2 (v, y+) ≻ (v', y-)
+loss:
+  alpha: 0.01
+  gamma: 0.0
+  lambda: 0.5
+  beta: 0.1
+  alpha_v2: 0.1

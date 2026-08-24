@@ -1,0 +1,10 @@
+# Sequence-level DPO baseline data (dpo_D3) with FiRe-MPO loss still using α/λ
+# For pure DPO use scripts/baselines/dpo_training.sh instead
+loss:
+  alpha: 0.01
+  gamma: 0.0
+  lambda: 0.5
+  beta: 0.1
+
+data:
+  preference_file: dpo_D3.json

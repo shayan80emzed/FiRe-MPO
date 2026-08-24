@@ -1,0 +1,6 @@
+# Table 2: w/o KL
+loss:
+  alpha: 0.0
+  gamma: 0.1
+  lambda: 0.5
+  beta: 0.1

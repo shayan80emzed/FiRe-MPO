@@ -1,0 +1,7 @@
+# Table 4: + v1 (v, y+) ≻ (v', y+) instead of / in addition to γ term disabled
+loss:
+  alpha: 0.01
+  gamma: 0.0
+  lambda: 0.5
+  beta: 0.1
+  alpha_v1: 0.1

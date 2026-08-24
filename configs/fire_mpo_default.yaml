@@ -1,0 +1,26 @@
+# FiRe-MPO paper defaults (Table 6, arXiv:2606.12590)
+# L = L_rank + α L_KL
+# L_rank includes γ · (v', y-) ≻ (v', y+)
+
+loss:
+  alpha: 0.01      # α — bidirectional token-wise KL
+  gamma: 0.1       # γ — visual dual-pair ranking
+  lambda: 0.5      # λ — forward-KL share
+  beta: 0.1        # β — preference temperature
+  # Ablations off by default:
+  # alpha_v1: null
+  # alpha_v2: null
+
+train:
+  learning_rate: 1.0e-6
+  num_train_epochs: 1
+  per_device_train_batch_size: 4
+  global_batch_size: 8
+
+model:
+  # Override via CLI --base_model_path / --processor_name
+  # base_model_path: FreedomIntelligence/HuatuoGPT-Vision-7B
+  # processor_name: Qwen/Qwen2.5-VL-7B-Instruct
+  lora_r: 128
+  lora_alpha: 256
+  lora_dropout: 0.05

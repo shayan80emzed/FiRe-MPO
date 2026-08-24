@@ -1,0 +1,320 @@
+\section{Results and Analysis}
+\label{section:results}
+
+\subsection{Main Results}
+\label{sec:res:main}
+
+\afterpage{
+\begin{table}[ht]
+  \caption{Comparison of preference-optimization losses on medical VQA and report-generation benchmarks. SLAKE and VQA-RAD report Closed and Open accuracy; IU-Xray reports the GREEN Score, Precision, and Recall. The Average column aggregates across all reported metrics. Higher is better; best and second best per backbone in \textbf{bold} and \underline{underline}, respectively. Text$^{*}$ denotes fine-grained text. Results for \ourloss{} and reproduced baselines are obtained under a unified experimental protocol. Rows in gray correspond to previously published methods (MMedPO, FiSAO, and STLLaVA-Med) and are reported using the metrics provided in their original papers.\\}
+  \label{tab:results_loss_updated}
+  \centering
+  \small
+  \resizebox{\textwidth}{!}{
+  \begin{tabular}{l@{\hspace{3pt}}c@{\hspace{2pt}}c | c@{\hspace{3pt}}c | c@{\hspace{3pt}}c | c@{\hspace{3pt}}c@{\hspace{3pt}}c | c}
+    \toprule
+    & \textbf{Text$^{*}$} & \textbf{Img.} & \multicolumn{2}{c|}{\textbf{SLAKE}} & \multicolumn{2}{c|}{\textbf{VQA-RAD}} & \multicolumn{3}{c|}{\textbf{IU-Xray}} & \textbf{Average} \\
+    Models & \textbf{Pref.} & \textbf{Pref.} & Closed & Open & Closed & Open & GREEN Score & Prec. & Rec. & \\
+    \midrule
+    HuatuoGPT-Vision-7B~\cite{chen2024towards} & - & - & 70.33 & 47.49 & 68.58 & 40.53 & 71.55 & 76.44 & 58.47 & 61.21 \\
+    + DPO~\cite{rafailov2023direct}               & $\times$ & $\times$ & \underline{79.40} & 55.38 & 71.65 & 39.47 & 71.66 & 74.07 & 59.32 & 64.46 \\
+    + mDPO~\cite{wang2024mdpo}              & $\times$ & \checkmark & 73.59 & 56.10 & \underline{72.80} & 40.58 & 73.17 & 67.80 & 62.03 & 64.82 \\
+    + RRPO~\cite{sarkar2025self}              & \checkmark & $\times$ & 79.12 & \underline{59.11} & 71.26 & \underline{43.68} & \underline{78.84} & \underline{77.12} & \textbf{64.24} & \underline{68.15} \\
+    + MASK-DPO~\cite{gu2025mask}          & \checkmark & $\times$ & \textbf{81.32} & 57.10 & \textbf{73.18} & \underline{43.68} & 58.42 & 58.98 & 55.59 & 61.52 \\
+    + \ourloss{} (Ours)         & \checkmark & \checkmark & \textbf{81.32} \textsubscript{\color{green!60!black}\tiny $\uparrow 10.9$} & \textbf{61.26} \textsubscript{\color{green!60!black}\tiny $\uparrow 13.7$} & 71.26 \textsubscript{\color{green!60!black}\tiny $\uparrow 2.68$} & \textbf{45.26} \textsubscript{\color{green!60!black}\tiny $\uparrow 4.73$} & \textbf{80.70} \textsubscript{\color{green!60!black}\tiny $\uparrow 9.15$} & \textbf{82.54} \textsubscript{\color{green!60!black}\tiny $\uparrow 6.10$} & \underline{63.56} \textsubscript{\color{green!60!black}\tiny $\uparrow 5.09$} & \textbf{69.71} \textsubscript{\color{green!60!black}\tiny $\uparrow 8.50$} \\
+    \midrule
+    Qwen3-VL-4B-Instruct~\cite{bai2025qwen3} & - & - & 76.64 & 56.24 & 64.75 & 40.00 & 72.18 & \underline{85.08} & 71.18 & 63.24 \\
+    + DPO                & $\times$ & $\times$ & \textbf{82.41} & 50.78 & 67.43 & 38.94 & 71.11 & 82.71 & 71.18 & 62.73 \\
+    + mDPO               & $\times$ & \checkmark & 77.19 & 56.24 & 68.58 & 40.00 & 71.66 & 82.71 & 71.18 & 63.87 \\
+    + RRPO               & \checkmark & $\times$ & 77.19 & \underline{60.11} & 67.43 & \textbf{41.57} & 73.27 & \underline{85.08} & 72.37 & 65.26 \\
+    + MASK-DPO           & \checkmark & $\times$ & 80.49 & 59.54 & \underline{69.34} & 39.94 & \underline{75.11} & 79.83 & \textbf{76.27} & \underline{66.12} \\
+    + \ourloss{} (Ours)          & \checkmark & \checkmark & \underline{81.32} \textsubscript{\color{green!60!black}\tiny $\uparrow 4.68$} & \textbf{60.25} \textsubscript{\color{green!60!black}\tiny $\uparrow 4.01$} & \textbf{71.26} \textsubscript{\color{green!60!black}\tiny $\uparrow 6.51$} & \underline{41.05} \textsubscript{\color{green!60!black}\tiny $\uparrow 1.05$} & \textbf{76.22} \textsubscript{\color{green!60!black}\tiny $\uparrow 4.04$} & \textbf{89.53} \textsubscript{\color{green!60!black}\tiny $\uparrow 4.45$} & \underline{73.89} \textsubscript{\color{green!60!black}\tiny $\uparrow 2.71$} & \textbf{67.41} \textsubscript{\color{green!60!black}\tiny $\uparrow 4.17$} \\
+    \midrule
+    \textcolor{gray}{MMedPO~\cite{zhu2024mmedpo}}      & \textcolor{gray}{$\times$} & \textcolor{gray}{$\times$} & \textcolor{gray}{73.08} & \textcolor{gray}{53.99} & \textcolor{gray}{66.54} & \textcolor{gray}{36.36} & \textcolor{gray}{-} & \textcolor{gray}{-} & \textcolor{gray}{-} & \textcolor{gray}{-} \\
+    \textcolor{gray}{FiSAO~\cite{cui2024fine}}       & \textcolor{gray}{$\times$} & \textcolor{gray}{$\times$} & \textcolor{gray}{70.46} & \textcolor{gray}{52.69} & \textcolor{gray}{64.11} & \textcolor{gray}{32.70} & \textcolor{gray}{-} & \textcolor{gray}{-} & \textcolor{gray}{-} & \textcolor{gray}{-} \\
+    \textcolor{gray}{STLLaVA-Med~\cite{sun2024self}} & \textcolor{gray}{$\times$} & \textcolor{gray}{$\times$} & \textcolor{gray}{61.75} & \textcolor{gray}{48.65} & \textcolor{gray}{64.38} & \textcolor{gray}{30.17} & \textcolor{gray}{-} & \textcolor{gray}{-} & \textcolor{gray}{-} & \textcolor{gray}{-} \\
+    \bottomrule
+  \end{tabular}
+  }
+\end{table}
+}
+
+Table~\ref{tab:results_loss_updated} reports the performance of different preference-optimization strategies across medical VQA and report-generation benchmarks.
+
+On \texttt{HuatuoGPT-Vision-7B}, \ourloss{} achieves the highest overall average score of $69.71\%$, improving upon the base model ($61.21\%$) by $8.50$ points, a relative gain of $\mathbf{+13.89\%}$. The largest relative improvements are concentrated on the open-ended and report-generation splits: SLAKE Open ($+29.0\%$), IU-Xray GREEN Score ($+12.8\%$), SLAKE Closed ($+15.6\%$), and SLAKE Overall ($+13.9\%$). On \texttt{Qwen3-VL-4B-Instruct}, the method again leads on most splits, including SLAKE Closed ($81.32\%$), VQA-RAD Closed ($71.26\%$), VQA-RAD Overall ($56.16\%$), and IU-Xray Average and Precision ($79.88\%$ / $89.53\%$), confirming that the gains transfer across both medical-specialized and general-purpose backbones. Qualitative examples are shown in Section~\ref{sec:res:qualitative} and Appendix~\ref{app:cases}.
+
+Three patterns in the table deserve comment beyond the headline average.
+
+\textbf{The gain is concentrated where the reward is sparsest.} Improvements on Open questions and on report generation are consistently larger than on Closed questions. This is the pattern the analysis of Section~\ref{sec:ana:coarse} predicts: closed binary questions have short answers in which the decisive span is most of the response, so a sequence-level reward is already approximately fine-grained. Long open answers and multi-sentence reports are where uniform token weighting dilutes the signal most, and they are where localizing it helps most.
+
+\textbf{Fine-grained text alone is not enough, and neither is image preference alone.} Reading the two design-choice columns against the averages separates the contributions. mDPO, which adds image preference without fine-grained text, gains $0.36$ points over DPO on HuatuoGPT. RRPO, which adds fine-grained text without image preference, gains $3.69$. \ourloss{}, which has both, gains $5.25$ over DPO. The two mechanisms are complementary rather than redundant, which is the central claim the baseline selection was designed to test.
+
+\textbf{MASK-DPO exposes the stability problem.} MASK-DPO is competitive or best on the VQA splits for HuatuoGPT ($81.32$ Closed, $73.18$ VQA-RAD Closed) yet collapses on IU-Xray ($58.42$ GREEN, below the $71.55$ base model). It applies localized textual rewards without a regularizer constraining policy drift. Long-form generation is precisely the regime in which the sequence-level gradient magnitude problem noted in Section~\ref{sec:ana:prelim} bites hardest.
+
+The connection to our own ablation here is exact rather than analogous. MASK-DPO is, in this unified implementation, the $\alpha = 0$ configuration of the fine-grained objective --- localized rewards with the regularizer switched off --- so the \emph{w/o KL} row of Table~\ref{tab:regularizer} and the MASK-DPO row of Table~\ref{tab:results_loss_updated} describe the same trained model, and report the same IU-Xray GREEN score of $58.42$ and the same average of $61.52$. The baseline and the ablation are two readings of one experiment, which means the collapse can be attributed to the missing regularizer specifically, and not to any other difference in how the two methods were implemented or trained.
+
+\ourloss{} is not uniformly best on every cell. On HuatuoGPT VQA-RAD Closed it trails MASK-DPO ($71.26$ versus $73.18$), and on Qwen3 VQA-RAD Open it trails RRPO ($41.05$ versus $41.57$). These are the two smallest splits in the study, and the differences are within the range that single-run evaluation cannot resolve --- see Section~\ref{sec:res:variance}.
+
+\subsection{Visual Grounding}
+\label{sec:res:grounding}
+
+\afterpage{
+    \begin{figure}[t]
+        \centering
+        \includegraphics[width=\textwidth]{visual-attention.pdf}
+        \caption{\ourloss{} shows superior visual grounding compared to base models and DPO alignment. Attention Ratio (higher is better), KL divergence, and JS divergence (both lower is better) are computed per decoder layer on the VGMED Localization and Attribute subsets, for both backbones.}
+        \label{fig:visual_attention}
+    \end{figure}
+}
+
+Table~\ref{tab:results_loss_updated} establishes that \ourloss{} answers more questions correctly. It does not establish \emph{why}, and Section~\ref{sec:ana:grounding} argued that a purely textual objective can raise accuracy without improving grounding at all. Figure~\ref{fig:visual_attention} tests the mechanism directly, by measuring where the model attends rather than what it outputs.
+
+The figure provides layer-wise analysis of visual grounding on localization and attribute tokens. Across both backbones, the baseline unaligned models (\textit{base}) and standard sequence-level DPO alignment exhibit clear limitations in their internal layer representations, showing lower AR values in deeper layers and weaker alignment to clinically relevant localization and attribute information. In contrast, \ourloss{} demonstrates stronger visual grounding and more controlled distributional alignment across both the specialized \texttt{HuatuoGPT-Vision-7B} and the general-purpose \texttt{Qwen3-VL-4B-Instruct} backbones. Enabled by the fine-grained image preference construction pipeline, the model progressively shifts attention toward diagnostically relevant localization and attribute tokens while maintaining lower KL and JS divergence throughout the network.
+
+This behaviour becomes particularly evident in the deeper layers, where the separation between \ourloss{} and the baseline methods is most pronounced, suggesting that the model relies more consistently on clinically relevant visual evidence when forming its final predictions. The depth-dependence is itself informative: early layers are dominated by generic visual processing that alignment does not touch, while the later layers are where the model commits to an answer. A grounding improvement that appears only in those later layers is consistent with the objective changing how visual evidence is \emph{used} at decision time rather than how it is encoded --- which is what one would expect given that the vision tower is frozen throughout (Section~\ref{sec:met:implementation}).
+
+The DPO curves are the important control. DPO improves accuracy over the base model on several splits, yet its grounding profile tracks the unaligned base model closely. This is direct evidence for the claim in Section~\ref{sec:ana:grounding} that textual preference optimization can buy accuracy through linguistic association rather than through improved use of visual evidence.
+
+Grounding is measured on the VGMED SLAKE subset, and the models evaluated here are the SLAKE-aligned checkpoints. This scope is imposed by the benchmark rather than chosen: the protocol requires per-question region annotations, which VGMED provides only for the SLAKE images it curates, so there is no corresponding grounding evaluation for VQA-RAD or IU-Xray.
+
+\subsection{Training Dynamics}
+\label{sec:res:dynamics}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\textwidth]{training_dynamics.pdf}
+    \caption{Training dynamics on SLAKE, from the optimizer logs of the aligned runs. Colour encodes the method and line style the backbone. (a) Reward accuracy and (b) reward margin on the masked spans; (c) the three terms of the \ourloss{} objective, scaled by the coefficients with which they enter Equation~\ref{eq:firempo-total}; (d) gradient norm on a logarithmic scale. The Qwen3 DPO run (orange, dashed) saturates its preference objective within roughly fifty steps and its gradients then collapse by six orders of magnitude.}
+    \label{fig:training_dynamics}
+\end{figure}
+
+Figure~\ref{fig:training_dynamics} examines the optimization itself rather than its end product, and it makes the reward-hacking argument of Section~\ref{sec:ana:reward-hacking} visible in a second, independent way.
+
+\textbf{Saturation of the preference objective.} Panels (a) and (b) show the Qwen3 DPO run reaching a reward accuracy of exactly $1.0$ within about fifty steps and holding it for the remaining five hundred, while its reward margin climbs to roughly $17$ and plateaus. Perfect separation of every preference pair in the corpus after a twelfth of one epoch does not indicate that a hard clinical distinction has been learned; it indicates that the model found a feature that separates the pairs trivially. The \ourloss{} runs, whose pairs are stylistically matched by construction, sit at $0.80$--$0.90$ accuracy with margins near $1.5$ throughout --- the profile of an objective that remains difficult because the only available signal is the clinical one.
+
+\textbf{The consequence for optimization.} Panel (d) shows what saturation costs. Because the DPO loss is $-\log\sigma(\cdot)$ of the margin, a margin of $17$ places the objective in a region where its gradient is vanishingly small. The Qwen3 DPO gradient norm falls from order $10^{-1}$ to order $10^{-4}$ within the first fifty steps and never recovers, meaning the run spends more than $90\%$ of its budget making essentially no parameter updates. This is a mechanistic account of the flat medical accuracy in Figure~\ref{fig:reward_hacking_analysis}: the model is not failing to learn the clinical distinction because the distinction is hard, but because it stopped learning anything once the stylistic shortcut had saturated the objective. The corresponding row of Table~\ref{tab:results_loss_updated} --- Qwen3 + DPO, the only aligned row that scores \emph{below} its own base model on average ($62.73$ versus $63.24$) --- is the downstream result. All \ourloss{} runs maintain gradient norms in the $10^{1}$--$10^{2}$ range for the entire epoch.
+
+\textbf{The size of the KL term.} Panel (c) decomposes the \ourloss{} objective into its three terms, each scaled by the coefficient with which it actually enters Equation~\ref{eq:firempo-total}. The base ranking loss dominates, falling from $0.70$ to about $0.35$. The visual term contributes roughly $0.11$ after scaling by $\gamma = 0.1$, and the bidirectional KL contributes only about $0.015$ after scaling by $\alpha = 0.01$ --- around $4\%$ of the total. That the smallest term by two orders of magnitude is also the one whose removal costs $22$ points of GREEN score (Section~\ref{sec:res:abl-kl}) is worth stating plainly: the regularizer does not work by contributing loss, it works by constraining the direction of the update.
+
+\subsection{Ablation: Bidirectional KL Regularization}
+\label{sec:res:abl-kl}
+
+We ablate the three core design choices of \ourloss{} on \texttt{HuatuoGPT-Vision-7B}.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Impact of forward and reverse KL regularization across medical VQA and report-generation benchmarks.}
+\label{tab:regularizer}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Metric} & \textbf{SLAKE} & \textbf{VQA-RAD} & \textbf{IU-Xray} & \textbf{Average} \\
+\midrule
+\ourloss{} (Ours) & \textbf{68.14} & {60.31} & \textbf{80.70} & \textbf{69.72}\\
+\midrule
+w/o Reverse KL & 65.97 & 59.65 & 78.84 & 68.15 \\
+w/o Forward KL & 66.35 & 59.65 & 80.98 & 68.99  \\
+w/o KL         & 65.40 & \textbf{60.75} & 58.42 & 61.52\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:regularizer} evaluates the contribution of the forward and reverse KL components. Removing the KL regularizer entirely (\emph{w/o KL}) leads to the largest performance drop on IU-Xray ($80.70\%$ to $58.42\%$). This suggests that regularization plays an important role in stabilizing optimization, especially for long-form report generation. As noted in Section~\ref{sec:res:main}, this configuration \emph{is} MASK-DPO: the localized reward is retained and only $\alpha$ is set to zero, so the row simultaneously serves as an ablation of our regularizer and as the MASK-DPO baseline of Table~\ref{tab:results_loss_updated}. The missing regularizer, not the localized rewards, is what breaks that baseline on reports.
+
+The two KL terms contribute differently, and in the directions the analysis of Section~\ref{sec:ana:kl} predicts. Removing the reverse KL term (\emph{w/o Reverse KL}) reduces performance across all three benchmarks, lowering SLAKE from $68.14\%$ to $65.97\%$, VQA-RAD from $60.31\%$ to $59.65\%$, and IU-Xray from $80.70\%$ to $78.84\%$. This is the tail-suppression effect: without the mode-seeking term, spuriously fluent but clinically incorrect continuations retain probability mass. In contrast, removing the forward KL term (\emph{w/o Forward KL}) primarily affects the VQA tasks, reducing SLAKE to $66.35\%$ and VQA-RAD to $59.65\%$, while IU-Xray is essentially unchanged ($80.98\%$). This asymmetry is consistent with forward KL's role as a coverage safeguard: open-ended question answering draws on the breadth of the base model's clinical knowledge, whereas report generation follows a comparatively narrow template where coverage matters less.
+
+Taken together, these results indicate that the full bidirectional formulation provides the most consistent performance across clinical settings that require both detailed report generation and open-ended visual question answering. Notably, no single variant wins everywhere --- \emph{w/o KL} is best on VQA-RAD and \emph{w/o Forward KL} is marginally best on IU-Xray --- but only the full formulation avoids a severe failure on any benchmark.
+
+\subsection{Ablation: Visual-Contrastive Preference Pairs}
+\label{sec:res:abl-visual}
+
+\begin{table}[ht]
+\centering
+\small
+\begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \caption{Comparison of image corruption strategies used for visual preference construction.}
+    \label{tab:corruption}
+    \resizebox{\linewidth}{!}{
+        \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Corruption Type} & \textbf{SLAKE} & \textbf{VQA-RAD} & \textbf{IU-Xray} & \textbf{Avg.} \\
+        \midrule
+        Lesion-Based & \textbf{68.14} & \textbf{60.31} & \textbf{80.70} & \textbf{69.72}\\
+        Cropped & 56.13 & 58.76 & 70.13 &  61.67\\
+        Image Level Noise & 66.35 & 59.65 & 79.10 & 68.37\\
+        Full Black         & 66.72 & 55.28 & 60.22 & 60.74 \\
+        \bottomrule
+        \end{tabular}
+    }
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \caption{Ablation of visual preference formulations.}
+    \label{tab:visual_ablation}
+    \resizebox{\linewidth}{!}{
+        \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Metric} & \textbf{SLAKE} & \textbf{VQA-RAD} & \textbf{IU-Xray} & \textbf{Avg.} \\
+        \midrule
+        \ourloss{} (Ours) & \textbf{68.14} & \textbf{60.31} & 80.70 & \textbf{69.72}\\
+        \midrule
+        w/o visual pref. & 67.48 & 58.76 & \textbf{81.79} & 69.34 \\
+        + v1 ($v, q, y^+ \succ v', q, y^+$) & 63.05 & 58.09 & 77.73 & 66.29 \\
+        + v2 ($v, q, y^+ \succ v', q, y^-$) & 65.60 & 59.64 & 79.48 & 68.24 \\
+        \bottomrule
+        \end{tabular}
+    }
+\end{minipage}
+\end{table}
+
+Tables~\ref{tab:corruption} and~\ref{tab:visual_ablation} evaluate both the image corruption strategy and the visual preference formulation.
+
+\textbf{Corruption granularity.} Table~\ref{tab:corruption} compares different image corruption strategies. Lesion-based corruption achieves the strongest overall performance, outperforming global perturbations such as cropping, image-level noise, and full-image masking across all three benchmarks. The largest gaps are observed relative to cropped images on SLAKE ($68.14\%$ vs.\ $56.13\%$) and fully blacked-out images on IU-Xray ($80.70\%$ vs.\ $60.22\%$).
+
+The ordering of the alternatives is itself instructive. Image-level noise --- the same perturbation as the lesion-based variant, applied globally --- is the closest competitor at $68.37\%$, confirming that the mechanism is genuinely about \emph{where} the corruption is applied rather than what kind it is. Cropping and full blacking perform far worse, and for a reason worth naming: both produce an image that is trivially identifiable as degraded. The model can learn to detect the corruption itself and condition on that, rather than learning to depend on the lesion. Lesion-targeted noise leaves a plausible-looking radiograph in which only the diagnostically decisive region has been destroyed, so the only way to satisfy the objective is to actually attend to that region. These results support the central design choice of \ourloss{}: it teaches the model to anchor its clinical assertions to specific anatomical regions, effectively penalizing lucky hallucinations that lack authentic visual grounding.
+
+\textbf{Preference direction.} Removing visual preferences entirely (Table~\ref{tab:visual_ablation}) reduces performance on the VQA benchmarks, lowering SLAKE from $68.14\%$ to $67.48\%$ and VQA-RAD from $60.31\%$ to $58.76\%$, although IU-Xray improves slightly to $81.79\%$. We further compare the two natural alternative formulations. Both perform worse than the proposed dual-constraint design, with the largest degradation observed for v1, where SLAKE decreases to $63.05\%$ and IU-Xray to $77.73\%$.
+
+The gap between v1 and the proposed formulation is the clearest evidence for the reversal argument of Section~\ref{sec:met:ranking}. Variant v1 merely prefers the correct answer under the clean image over the same answer under the corrupted image; it never tells the model what it \emph{should} do when evidence is missing. Variant v2 is intermediate. Only the full formulation flips the preference under $v'$, and it is the strongest. These results indicate that contrasting clean and corrupted images alone is insufficient: the model also benefits from explicitly learning that a clinically specific answer should not be preferred when the supporting visual evidence has been removed.
+
+\subsection{Ablation: On-Policy Response Editing}
+\label{sec:res:abl-style}
+
+\afterpage{
+    \begin{figure}[t]
+        \centering
+        \includegraphics[width=\textwidth]{framework-examples.pdf}
+        \caption{Preference-pair construction used in the textual-style ablation. Vanilla preference learning compares the model output directly against the SFT ground truth, creating a large stylistic gap between the rejected and preferred responses. GT-style preference pairs preserve this off-policy mismatch: the preferred answer is short and reference-like, while the rejected answer remains model-like. Our LVLM-style construction edits only the clinically incorrect span while preserving the model's original response style. This isolates the preference signal to clinical factuality rather than surface-level formatting, and corresponds directly to the ablation in Table~\ref{tab:pair_ablation}.}
+        \label{fig:examples-fig}
+    \end{figure}
+}
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Comparison of preference-pair construction strategies on medical VQA benchmarks. Cl, Op, and Ov denote closed-ended, open-ended, and overall performance, respectively.}
+\label{tab:pair_ablation}
+\begin{tabular}{l | ccc | ccc}
+\toprule
+& \multicolumn{3}{c|}{\textbf{SLAKE}} & \multicolumn{3}{c}{\textbf{VQA-RAD}} \\
+\textbf{Models} & \textbf{Cl} & \textbf{Op} & \textbf{Ov} & \textbf{Cl} & \textbf{Op} & \textbf{Ov} \\
+\midrule
+Style Agnostic & 73.63 & 47.77 & 56.64 & 70.88 & 38.94 & 57.42 \\
+GT Style & \textbf{80.76} & 52.36 & 62.11 & \textbf{73.56} & \textbf{44.21} & \textbf{61.20} \\
+LVLM Style & 79.40 & \textbf{55.38} & \textbf{63.62} & 71.65 & 39.47 & 58.09 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Figure~\ref{fig:examples-fig} illustrates the three pair-construction strategies evaluated in Table~\ref{tab:pair_ablation}. The style-agnostic setting (vanilla preference learning), which does not explicitly control for stylistic differences between preferred and rejected responses, performs worst across both datasets, achieving overall scores of $56.64\%$ on SLAKE and $57.42\%$ on VQA-RAD. This indicates that the quality of the preference pairs plays a substantial role in downstream alignment performance.
+
+Both GT Style and LVLM Style substantially improve over the style-agnostic baseline, suggesting that preserving coherent response structure during preference construction is beneficial. In the \texttt{GT Style} (off-policy ground truth) setting, the preferred response is written in the style of the supervised reference, while the rejected response remains in the model's own style. In contrast, the \texttt{LVLM Style} (on-policy) approach edits only the clinically incorrect span while preserving the model's original syntax and verbosity. As a result, the preferred and rejected responses remain closer in style and differ primarily in clinical content rather than surface-level formatting. This makes preference learning less susceptible to stylistic shortcuts, where the model can increase the preference margin by imitating the form of the ground-truth response rather than correcting the underlying clinical error.
+
+The result requires an honest reading, because it is the one place where the evidence is mixed. LVLM Style wins overall on SLAKE ($63.62$ versus $62.11$), driven by a large gain on open-ended questions ($55.38$ versus $52.36$), but GT Style wins on VQA-RAD across all three columns. The split follows the response-length pattern seen throughout: the on-policy construction helps most where responses are long and the style gap is therefore largest, and least on VQA-RAD, whose answers are short enough that on-policy and reference styles nearly coincide. A second factor is that VQA-RAD is the smallest corpus in the study at $1{,}786$ pairs, so its measurements are the least stable.
+
+\subsubsection{Measuring the Stylistic Gap Directly}
+\label{sec:res:style-gap}
+
+The argument above rests on a claim about the \emph{data} --- that GT-Style pairs differ systematically in style while LVLM-Style pairs do not --- and that claim can be verified without training anything. Table~\ref{tab:style_gap} measures it directly over the preference corpora.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Stylistic separation between preferred and rejected responses under each construction, measured over the HuatuoGPT-Vision-7B preference corpora. Lengths are in whitespace tokens. $|\Delta\text{len}|$ is the mean \emph{paired} absolute length difference, and \emph{within 2} is the fraction of pairs whose two responses differ by at most two tokens. Edit distance is one minus the word-level sequence similarity, so $0$ means identical and $1$ fully disjoint.}
+\label{tab:style_gap}
+\begin{tabular}{llrrrrr}
+\toprule
+\textbf{Dataset} & \textbf{Construction} & \textbf{len($y^+$)} & \textbf{len($y^-$)} & $\mathbf{|\Delta\text{len}|}$ & \textbf{within 2} & \textbf{edit dist.} \\
+\midrule
+\multirow{3}{*}{SLAKE}
+ & Style Agnostic & 1.7  & 1.9  & 0.6  & 94.4\% & 0.894 \\
+ & GT Style       & 1.7  & 13.5 & 11.8 & 1.0\%  & 0.978 \\
+ & LVLM Style     & 13.1 & 13.5 & 1.3  & 88.1\% & 0.210 \\
+\midrule
+\multirow{3}{*}{VQA-RAD}
+ & Style Agnostic & 1.6  & 1.9  & 0.6  & 93.8\% & 0.921 \\
+ & GT Style       & 1.6  & 13.8 & 12.2 & 0.1\%  & 0.980 \\
+ & LVLM Style     & 13.3 & 13.8 & 1.6  & 86.7\% & 0.198 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The measurement makes the shortcut concrete. Under GT Style, the preferred response averages $1.7$ tokens against the rejected response's $13.5$, and only $1.0\%$ of pairs are within two tokens of each other. A classifier with no access to clinical content could separate $99\%$ of these pairs on length alone, and the word-level edit distance of $0.978$ confirms that the two responses share almost no surface material. This is precisely the spurious signal that Section~\ref{sec:ana:reward-hacking} argued the model would exploit in preference to the clinical distinction, and it is far easier to learn than the diagnosis.
+
+Under LVLM Style the situation inverts. The two responses are nearly identical in length --- $88.1\%$ of pairs differ by at most two tokens --- and the edit distance falls to $0.210$, meaning roughly four fifths of the two responses is shared verbatim. What remains is the edited clinical span. A model cannot raise its preference margin here without engaging with the clinical content, because there is no other systematic difference to exploit.
+
+Style Agnostic is instructive as the third point. Its pairs are also well matched in length ($94.4\%$ within two tokens), yet it performs worst in Table~\ref{tab:pair_ablation}. Its edit distance of $0.894$ explains why: the construction retains only the masked spans, so the two responses are short and almost entirely disjoint, and the model sees the corrected phrase stripped of the sentence that gives it meaning. Matching style is therefore necessary but not sufficient --- the clinical correction must remain embedded in the surrounding response for the preference to be informative.
+
+Taken together with Table~\ref{tab:pair_ablation}, this supports a more precise statement than the accuracy numbers alone permit. The mechanism claimed in Chapter~\ref{section:analysis} is confirmed to exist in the data at the scale claimed. What the single-run accuracies cannot yet settle is how much of the residual difference between GT Style and LVLM Style is attributable to that mechanism as opposed to run-to-run variation, given that the two orderings disagree between SLAKE and VQA-RAD by margins of one to three points.
+
+\subsection{Hyperparameter Sensitivity}
+\label{sec:res:sensitivity}
+
+\ourloss{} introduces three hyperparameters beyond the standard DPO temperature: $\lambda$ (the balance between the two KL directions), $\alpha$ (the weight of the regularizer), and $\gamma$ (the weight of the visual grounding term). All results above use $\lambda = 0.5$, $\alpha = 0.01$, and $\gamma = 0.1$.
+
+The ablations already reported constitute a coarse sensitivity analysis, because each removes a component by driving one of these parameters to an endpoint of its range. Reading them that way, Table~\ref{tab:sensitivity} collects what the experiments establish about each parameter.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Sensitivity of the average score across the three benchmarks to each loss coefficient, assembled from the ablations of Tables~\ref{tab:regularizer} and~\ref{tab:visual_ablation} on HuatuoGPT-Vision-7B. Each row varies one coefficient with the others held at their defaults. Values marked $^{\dagger}$ are the default configuration.}
+\label{tab:sensitivity}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Coefficient} & \textbf{Role} & \multicolumn{3}{c}{\textbf{Average score}} \\
+\midrule
+\multirow{2}{*}{$\lambda$} & \multirow{2}{*}{forward/reverse KL balance}
+  & $\lambda{=}0$ & $\lambda{=}0.5^{\dagger}$ & $\lambda{=}1$ \\
+  & & 68.99 & \textbf{69.72} & 68.15 \\
+\midrule
+\multirow{2}{*}{$\alpha$} & \multirow{2}{*}{KL regularizer weight}
+  & $\alpha{=}0$ & $\alpha{=}0.01^{\dagger}$ & \\
+  & & 61.52 & \textbf{69.72} & \\
+\midrule
+\multirow{2}{*}{$\gamma$} & \multirow{2}{*}{visual grounding weight}
+  & $\gamma{=}0$ & $\gamma{=}0.1^{\dagger}$ & \\
+  & & 69.34 & \textbf{69.72} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three conclusions are supported, and their strength differs considerably.
+
+The $\lambda$ result is the most informative, because it has an interior point flanked by both endpoints. The default $\lambda = 0.5$ outperforms both pure reverse KL ($68.99$) and pure forward KL ($68.15$), so the optimum is genuinely interior rather than at a boundary. This is the empirical content of the argument in Section~\ref{sec:ana:kl}: a balanced regularizer is not a compromise between two adequate options but the only setting that avoids both failure modes. The curve is also asymmetric --- forward KL alone is the worse endpoint, costing $1.57$ points against $0.73$ for reverse KL alone --- indicating that tail suppression contributes more than coverage preservation at this operating point, which is what one would expect when the objective is factuality.
+
+The $\alpha$ result is the largest effect in the entire study, but it is measured at only two points. Moving from $\alpha = 0$ to $\alpha = 0.01$ is worth $8.20$ points on average, almost all of it on report generation. What these experiments do not establish is the shape of the response between and beyond those points: whether performance is flat across an order of magnitude of $\alpha$, or whether $0.01$ sits on a narrow peak. Given that the regularizer contributes only about $4\%$ of the total loss magnitude (Section~\ref{sec:res:dynamics}), a broad optimum is plausible, but it is not demonstrated here.
+
+The $\gamma$ result is the weakest. The gain from adding the visual term at $\gamma = 0.1$ is $0.38$ points on the average, which is smaller than the differences elsewhere in this chapter that Section~\ref{sec:res:variance} argues are not resolvable by single-run evaluation. The stronger evidence for the visual component is not this coefficient comparison but the preference-formulation ablation in Table~\ref{tab:visual_ablation}, where the alternative formulations v1 and v2 lose $3.43$ and $1.48$ points respectively, and the corruption-strategy comparison in Table~\ref{tab:corruption}, where the gaps reach $8$ points. Those margins are large enough to be informative; the $\gamma$ margin alone is not.
+
+The analysis is therefore coarse: three points for $\lambda$ and two each for $\alpha$ and $\gamma$, all on a single backbone and a single seed. It establishes that the interior $\lambda$ is correct and that $\alpha$ matters enormously, but it does not locate the optimum of any of the three, and the defaults should be read as reasonable settings rather than tuned ones.
+
+\subsection{Which Results the Evidence Supports}
+\label{sec:res:variance}
+
+Every number reported in this chapter comes from a single training run. That is standard practice in the preference-optimization literature, but it bounds what may legitimately be concluded, and this section states those bounds explicitly rather than leaving them to the reader.
+
+Two dispersion estimates are available. The GREEN evaluation on IU-Xray reports a per-report standard deviation alongside the mean: $0.7327 \pm 0.4229$ for \ourloss{} against $0.6071 \pm 0.4338$ for DPO. The spread across individual reports is large relative to the difference in means, which is expected for a per-example metric over $590$ test reports, but it shows that the aggregate comparison rests on averaging rather than on a consistent per-case advantage. Separately, the training-dynamics analysis of Section~\ref{sec:res:dynamics} shows the two backbones behaving very differently under the same objective, which is a reminder that a single configuration is not a single point of behaviour.
+
+Against that, the results divide into three tiers.
+
+\textbf{Robust.} Effects of eight points or more, reproduced across both backbones or across independent measurements, and accompanied by a mechanism. The collapse of long-form report generation when the KL regularizer is removed ($22.28$ points on IU-Xray) falls here: it appears twice under two names --- as the MASK-DPO baseline and as the \emph{w/o KL} ablation --- and Section~\ref{sec:res:dynamics} identifies the mechanism. So does the advantage of lesion-targeted over global corruption ($8.05$ points against cropping, $8.98$ against full masking), and the overall gain of \ourloss{} over the base models ($8.50$ and $4.17$ points). The grounding results of Section~\ref{sec:res:grounding} also belong here, being layer-wise curves separated consistently across all $32$ layers and two backbones rather than single scalars.
+
+\textbf{Supported by mechanism, not by margin alone.} Effects of one to three points that would individually be unresolvable, but which are corroborated by an independent measurement of the mechanism they are attributed to. The on-policy construction is the clearest case: its accuracy advantage is $1.51$ points on SLAKE and reverses on VQA-RAD, but the stylistic separation it is supposed to remove is measured directly in Table~\ref{tab:style_gap} and is enormous --- $99\%$ of GT-Style pairs separable on length alone against $12\%$ of LVLM-Style pairs. The mechanism is established even where the accuracy margin is not. The reward-hacking analysis is similar: the accuracy evidence in Figure~\ref{fig:reward_hacking_analysis} is corroborated by the gradient collapse in Figure~\ref{fig:training_dynamics}, which is a six-order-of-magnitude effect rather than a marginal one.
+
+\textbf{Directional only.} Differences below roughly three points with no corroborating measurement. The VQA-RAD Open gain of $+1.05$ on Qwen3, the $0.38$-point average gain from the visual term in Table~\ref{tab:visual_ablation}, and the ordering of \ourloss{} against MASK-DPO on VQA-RAD Closed ($71.26$ against $73.18$) are in this tier. These are reported for completeness and should be read as consistent with the thesis rather than as evidence for it. Notably, no claim in Chapter~\ref{section:conclusion} depends on any of them.
+
+The natural strengthening of this analysis is seed replication with paired significance testing over per-question outcomes, which would convert the third tier into either the second or a null result. That is a matter of compute rather than of methodology: a three-seed replication of the four methods across both backbones is $24$ training runs, which at the measured cost of Table~\ref{tab:cost} is roughly a day of single-GPU time, and the peak memory reported there rules out running them concurrently on one device.
+
+\subsection{Qualitative Analysis}
+\label{sec:res:qualitative}
+
+The quantitative results are complemented by inspection of individual outputs; a representative set is collected in Appendix~\ref{app:cases}. Three behavioural patterns recur.
+
+\textbf{Verbosity collapse under DPO.} On many questions the DPO-aligned model answers with a bare noun phrase --- ``Lung'', ``No'', ``Left'' --- discarding the explanatory framing of the base model entirely. This is the generation-length effect of Figure~\ref{fig:reward_hacking_analysis} visible case by case. \ourloss{}-aligned outputs retain the base model's explanatory register while correcting the clinical content, which is the intended consequence of on-policy construction. The distinction matters clinically: a bare label is not auditable, whereas a stated finding with its supporting observation can be checked by the reader.
+
+\textbf{Correction of confident hallucinations.} On cases where the base model asserts a finding that is not present --- for instance, describing bilateral lung consolidation on a radiograph where the ground truth is negative --- \ourloss{} produces an explicit negative statement that names the evidence for it, whereas the base model produces a fluent multi-sentence elaboration of the non-existent finding.
+
+\textbf{Residual errors are inherited.} Where the base model's perceptual reading is wrong rather than its verbalization, alignment does not always recover it. This is consistent with the frozen vision tower: the objective can change how visual evidence is weighed, but it cannot supply evidence the encoder never extracted.
+
+Figures~\ref{fig:case1}--\ref{fig:case7} in Appendix~\ref{app:cases} show these three patterns across both backbones and all three benchmarks. They are offered as illustration of the mechanisms established quantitatively above, rather than as independent evidence; the cases in Appendix~\ref{app:cases} were selected to be representative of behaviours the aggregate metrics already measure.

@@ -1,0 +1,6 @@
+# Table 4: w/o visual preference
+loss:
+  alpha: 0.01
+  gamma: 0.0
+  lambda: 0.5
+  beta: 0.1

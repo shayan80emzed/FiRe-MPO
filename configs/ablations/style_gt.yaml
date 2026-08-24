@@ -1,0 +1,11 @@
+# Table 5: GT-style (off-policy) — train on dpo_D2.json
+# Use: --data_path preference_dataset/{model}/{dataset}/greedy/dpo_D2.json
+loss:
+  alpha: 0.01
+  gamma: 0.0
+  lambda: 0.5
+  beta: 0.1
+
+data:
+  preference_file: dpo_D2.json
+  note: "GT answer as chosen; model rejected with masks stripped"
