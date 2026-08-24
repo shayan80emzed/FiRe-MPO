@@ -25,6 +25,7 @@ figures/*.pdf
 # large/generated, not source
 .hf_dataset_cache/
 Thesis/
+thesis/
 thesis-source.zip
 .ipynb_checkpoints/
 .DS_Store
